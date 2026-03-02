@@ -1,0 +1,79 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Purpose
+
+This is a personal MCP (Model Context Protocol) context server. Its goal is not to make AI smarter, but to provide stable **assumptions and principles** ("ground")
+so that AI misunderstands the owner less. It exposes `AI_GUIDE.md` as a system-level context payload for LLM/tool clients.
+
+## AI workflow: read in this order
+
+When starting any task, read files in this order before writing or changing anything:
+
+1. `CLAUDE.md` (this file) — constraints and conventions
+2. `AI_GUIDE.md` — the owner's values and behavioral expectations for AI
+3. `docs/architecture.md` — system structure and extension points (if it exists)
+4. Only then: the specific files relevant to the task
+
+## Commands
+
+```bash
+# Install in editable mode (development)
+pip install -e .
+
+# Run the entrypoint (prints loaded context length)
+python -m personal_mcp.server
+
+# Verify AI_GUIDE.md copies are in sync
+diff AI_GUIDE.md src/personal_mcp/AI_GUIDE.md
+````
+
+Notes:
+
+* No test runner or linter is configured yet — the repo is intentionally minimal and evolving slowly.
+
+## Architecture
+
+AI_GUIDE.md                          ← Authoritative guide (edit root, then sync copy)
+docs/                                ← Design docs referenced from this file
+src/personal_mcp/
+AI_GUIDE.md                        ← Packaged copy (must match root AI_GUIDE.md)
+core/guide.py                      ← load_ai_guide(): loads the guide with two-stage fallback
+adapters/mcp_server.py             ← get_system_context(): thin adapter returning the guide text
+server.py                          ← CLI entrypoint (placeholder, calls get_system_context)
+
+Data flow: server.py → adapters/mcp_server.py → core/guide.py → AI_GUIDE.md
+
+## Where to put things
+
+| What                                       | Where                                                                        |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| AI behavior rules (attitude, prohibitions) | AI_GUIDE.md (root), then sync to src/personal_mcp/AI_GUIDE.md                |
+| New MCP adapter                            | src/personal_mcp/adapters/<name>.py + entry in docs/adapters.md              |
+| New MCP tool                               | src/personal_mcp/tools/<name>.py + entry in docs/tools.md (create if needed) |
+| Architecture decisions                     | docs/architecture.md                                                         |
+| Bug fix / refactor                         | Relevant .py file only; update docs only if public behavior changes          |
+
+## AI_GUIDE.md sync rule
+
+AI_GUIDE.md exists in two places:
+
+* AI_GUIDE.md (repo root) — human-editable source of truth
+* src/personal_mcp/AI_GUIDE.md — packaged copy accessed via importlib.resources
+
+Rule:
+
+* After editing the root file, copy it to the package path and commit both together.
+* Verify with: `diff AI_GUIDE.md src/personal_mcp/AI_GUIDE.md`
+
+## Branch / commit conventions (minimal)
+
+* Branch names: feat/<topic>, fix/<topic>, docs/<topic>
+* Commit messages: imperative, lowercase, no period (e.g., "add poe2 adapter skeleton")
+* Keep changes single-concern and reversible
+
+## Key design principle
+
+This repo prioritizes 納得感・安全性・可逆性 (conviction, safety, reversibility) over efficiency and completeness.
+Changes should be minimal, reversible, and slow by design. Do not over-engineer or add abstractions ahead of need.
