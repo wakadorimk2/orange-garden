@@ -6,12 +6,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from personal_mcp.storage.jsonl import append_jsonl
+from personal_mcp.storage.jsonl import append_jsonl, read_jsonl
 
 
 def _now_iso() -> str:
-    # JST運用でもISOはUTCにしておくと後で楽（表示でJSTに変換すればOK）
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_since(since: Optional[str]) -> Optional[datetime]:
+    if not since:
+        return None
+    # Accept "YYYY-MM-DD" or ISO
+    if len(since) == 10 and since[4] == "-" and since[7] == "-":
+        return datetime.fromisoformat(since + "T00:00:00+00:00")
+    return datetime.fromisoformat(since)
 
 
 @dataclass
@@ -41,3 +49,36 @@ def log_add(
     path = Path(data_dir) / "poe2" / "logs.jsonl"
     append_jsonl(path, asdict(record))
     return record
+
+
+def log_list(
+    n: int = 20,
+    kind: Optional[str] = None,
+    tag: Optional[str] = None,
+    since: Optional[str] = None,
+    data_dir: str = "data",
+) -> List[Dict[str, Any]]:
+    path = Path(data_dir) / "poe2" / "logs.jsonl"
+    rows = read_jsonl(path)
+
+    since_dt = _parse_since(since)
+
+    def ok(r: Dict[str, Any]) -> bool:
+        if kind and r.get("kind") != kind:
+            return False
+        if tag and tag not in (r.get("tags") or []):
+            return False
+        if since_dt:
+            ts = r.get("ts")
+            if not ts:
+                return False
+            try:
+                ts_dt = datetime.fromisoformat(ts)
+            except Exception:
+                return False
+            if ts_dt < since_dt:
+                return False
+        return True
+
+    filtered = [r for r in rows if ok(r)]
+    return list(reversed(filtered))[: max(0, n)]
