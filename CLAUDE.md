@@ -45,6 +45,11 @@ server.py                          ← CLI entrypoint (placeholder, calls get_sy
 
 Data flow: server.py → adapters/mcp_server.py → core/guide.py → AI_GUIDE.md
 
+Event model principle:
+* All domains converge to a common event format (timestamp, domain, payload)
+* Future auto-ingestion sources follow the same event model — do not diverge
+* Design should allow history reconstruction from stored events alone
+
 ## Where to put things
 
 | What                                       | Where                                                                        |
@@ -77,3 +82,14 @@ Rule:
 
 This repo prioritizes 納得感・安全性・可逆性 (conviction, safety, reversibility) over efficiency and completeness.
 Changes should be minimal, reversible, and slow by design. Do not over-engineer or add abstractions ahead of need.
+
+* Do not break the non-evaluative design — avoid scoring, comparative expressions, or implicit improvement suggestions
+* Do not add notifications or prompts that encourage user action
+* Logs are append-only; treat past records as immutable
+* When proposing deletion or overwrite of data, state the irreversibility explicitly and handle with extra care
+
+## Change policy
+
+* Do not make UX more stimulating (no urgency cues, streaks, countdowns, or progress bars)
+* Do not introduce gamification elements of any kind
+* Do not implement numeric optimization logic ahead of explicit user request
