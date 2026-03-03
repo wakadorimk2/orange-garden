@@ -69,6 +69,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_elist.add_argument("--data-dir", default="data")
     p_elist.add_argument("--json", action="store_true")
 
+    p_mood = sub.add_parser("mood-add", help="append a mood event to data/events.jsonl")
+    p_mood.add_argument("text", help="mood text")
+    p_mood.add_argument("--tags", default="")
+    p_mood.add_argument("--data-dir", default="data")
+
     p_log = sub.add_parser("poe2-log-add", help="append a poe2 log entry")
     p_log.add_argument("text", help="log text")
     p_log.add_argument("--kind", default="note")
@@ -117,6 +122,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.cmd == "info":
         text = get_system_context()
         print(f"loaded system context: {len(text)} chars")
+        return 0
+
+    if args.cmd == "mood-add":
+        tags = [t for t in args.tags.split(",") if t] if args.tags else []
+        rec = event_add(
+            domain="mood",
+            text=args.text,
+            tags=tags,
+            data_dir=args.data_dir,
+        )
+        print(json.dumps(rec, ensure_ascii=False, indent=2))
         return 0
 
     if args.cmd == "poe2-log-add":

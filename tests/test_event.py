@@ -134,6 +134,58 @@ def test_event_list_empty_for_unmatched_domain(data_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# mood-add tests (via server.main)
+# ---------------------------------------------------------------------------
+
+def test_mood_add_writes_mood_domain(data_dir: Path) -> None:
+    from personal_mcp.server import main
+    main(["mood-add", "少し疲れた", "--data-dir", str(data_dir)])
+
+    path = data_dir / "events.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["domain"] == "mood"
+    assert record["payload"]["text"] == "少し疲れた"
+
+
+def test_mood_add_no_numeric_score_in_payload(data_dir: Path) -> None:
+    from personal_mcp.server import main
+    main(["mood-add", "まあまあ", "--data-dir", str(data_dir)])
+
+    path = data_dir / "events.jsonl"
+    record = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    payload = record.get("payload", {})
+    numeric_keys = [k for k, v in payload.items() if isinstance(v, (int, float))]
+    assert numeric_keys == [], f"numeric keys found in payload: {numeric_keys}"
+
+
+def test_mood_add_with_tags(data_dir: Path) -> None:
+    from personal_mcp.server import main
+    main(["mood-add", "元気", "--tags", "work,tired", "--data-dir", str(data_dir)])
+
+    path = data_dir / "events.jsonl"
+    record = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert record["domain"] == "mood"
+    assert "work" in record["tags"]
+    assert "tired" in record["tags"]
+
+
+def test_mood_add_appends_to_existing_events(data_dir: Path) -> None:
+    path = data_dir / "events.jsonl"
+    path.write_text('{"dummy": true}\n', encoding="utf-8")
+
+    from personal_mcp.server import main
+    main(["mood-add", "追記テスト", "--data-dir", str(data_dir)])
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0]) == {"dummy": True}
+    record = json.loads(lines[1])
+    assert record["domain"] == "mood"
+
+
+# ---------------------------------------------------------------------------
 # text output format tests (via server.main)
 # ---------------------------------------------------------------------------
 
