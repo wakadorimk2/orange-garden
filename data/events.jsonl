@@ -1,2 +1,4 @@
 {"ts": "2026-03-03T11:26:14.067206+00:00", "domain": "mood", "payload": {"text": "少し疲れた"}, "tags": []}
 {"ts": "2026-03-03T11:26:47.258559+00:00", "domain": "mood", "payload": {"text": "少し疲れた"}, "tags": ["tired"]}
+{"ts": "2026-03-03T12:00:16.904715+00:00", "domain": "poe2", "payload": {"text": "ツール開発でちょっと休止中", "meta": {"kind": "note"}}, "tags": []}
+{"ts": "2026-03-03T12:00:57.502823+00:00", "domain": "poe2", "payload": {"text": "kindとtagのテスト", "meta": {"kind": "test"}}, "tags": ["test"]}
