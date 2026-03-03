@@ -40,48 +40,49 @@
 
 ### 現在（CLI、実装済み）
 
-最初のユースケースは PoE2（Path of Exile 2）のプレイログだが、設計は最初から汎用イベント基盤を前提としている。game / dev / art / life などのドメインをまたいだ記録への拡張を見据えて構造を保っている。
+MVP の中核はすでに実装されている。現在は共通イベント基盤で記録し、PoE2 はその上の代表ユースケースとして扱っている。
 
 ```bash
-# PoE2のプレイログを追加する
+# 任意ドメインのイベントを追加する
+python -m personal_mcp.server event-add "設計メモを書いた" \
+  --domain=worklog --tags=design,docs
+
+# 気分を記録する
+python -m personal_mcp.server mood-add "少し疲れた" --tags=tired
+
+# 日付ごとのタイムラインを一覧する
+python -m personal_mcp.server event-list --date 2026-03-03
+
+# PoE2 の記録を追加する（互換用の専用コマンドも残している）
 python -m personal_mcp.server poe2-log-add "アトラスの外縁でボス撃破" \
   --kind=milestone --tags=atlas,boss
 
-# 直近のログを一覧する
-python -m personal_mcp.server poe2-log-list --n 10
-
-# 絞り込み（kind / tag / 日付）
-python -m personal_mcp.server poe2-log-list --kind=milestone --since 2026-03-01
+# PoE2 Client.txt を監視してエリア遷移を自動記録する
+python -m personal_mcp.server poe2-watch --client-log /path/to/Client.txt
 ```
 
-ログは `data/poe2/logs.jsonl` に追記されます（削除・書き換えは不可）。
-
-### 近い将来のMVP（未実装）
-
-- ドメイン対応の汎用イベント記録（game / dev / art / life など）
-- 気分タグ（mood）と証跡（evidence）フィールドの追加
-- 日次タイムライン表示（一覧）
-- 静かな事実通知（行動後のみ）
-- モバイルホーム画面からのワンタップ記録
+イベントは `data/events.jsonl` に追記されます（削除・書き換えは不可）。`poe2-log-*` は互換用の入口で、保存先も共通イベントストアです。
 
 ---
 
 ## データモデル方針
 
-イベントは以下のフィールドで表現する（設計中）：
+イベントは共通 JSONL 形式で表現する：
 
-| フィールド  | 説明                                        |
-| ----------- | ------------------------------------------- |
-| `ts`        | タイムスタンプ（UTC ISO 8601）              |
-| `domain`    | ドメイン（game / dev / art / life など）    |
-| `kind`      | 種別（milestone / note / session など）     |
-| `text`      | フリーテキスト                              |
-| `tags`      | タグリスト                                  |
-| `mood`      | 気分（任意）                                |
-| `evidence`  | 証跡（スクリーンショットパスなど、任意）    |
-| `source`    | 記録元（manual / auto / mcp など）          |
+| フィールド | 説明 |
+| --- | --- |
+| `ts` | タイムスタンプ（UTC ISO 8601） |
+| `domain` | ドメイン（`poe2` / `mood` / `general` / 任意文字列） |
+| `payload.text` | 記録本文 |
+| `payload.meta` | 補助情報（任意。PoE2 の `kind` や自動取得元など） |
+| `tags` | タグリスト |
 
-**現在の実装：** `ts` / `kind` / `text` / `tags` / `meta` の5フィールド（poe2固定）。
+**現在の実装：**
+
+- 汎用 `event-add` / `event-list` / `event-today` がある
+- `mood-add` は `domain="mood"` のイベントとして保存する
+- `poe2-log-add` / `poe2-log-list` は `domain="poe2"` の専用入口として動く
+- `poe2-watch` は `Client.txt` から `area_transition` を自動記録する
 
 **原則：**
 
@@ -90,32 +91,35 @@ python -m personal_mcp.server poe2-log-list --kind=milestone --since 2026-03-01
 
 ---
 
-## MVPスコープ
+## Plan / Roadmap
 
-最初の1〜2スプリントで実現する最小：
+**この README での MVP 達成の定義**
 
-- [ ] 汎用 `event-add` コマンド（domain 対応）
-- [ ] `event-list` の日次タイムライン表示
-- [ ] 気分タグ（mood）の記録
-- [ ] `data/events.jsonl` への統合（poe2専用を汎用化）
-- [ ] 静かな事実通知（CLI or モバイル）
+- 共通イベント追加 (`event-add`)
+- 日次タイムライン一覧 (`event-list` / `event-today`)
+- 気分記録 (`mood-add`)
+- 単一保存先 (`data/events.jsonl`)
+- 代表ユースケースとしての PoE2 記録 (`poe2-log-*` / `poe2-watch`)
 
----
+### Now
 
-## ロードマップ
+- CLI ベースの観測フローは動いており、MVP の必須要素は揃っている
+- 保存形式は `data/events.jsonl` に統一され、PoE2 も mood も同じイベント形式で追記される
+- PoE2 では手動記録に加えて `Client.txt` 監視による自動記録も最小実装されている
 
-### 短期（〜3ヶ月）
+### Next
 
-- モバイルUI（ホーム画面ウィジェット、召喚型）
-- 複数ドメインの統合タイムライン
-- 表示圧縮（日次ごとに折りたたむ）
+- domain 拡張を README と CLI 例の両方で使いやすくする
+- `eng` / `worklog` / `art` / `life` など、PoE2 以外の継続観測ユースケースを具体化する
+- 表示面では複数ドメインを無理なく眺められるタイムライン整理を進める
+- モバイルホーム画面や簡易 UI など、「記録を始めるまでの摩擦」を下げる入口を検討する
 
-### 中期（〜半年）
+### Later
 
-- 自動取得（ゲームAPI / Gitコミット / 外部サービス）を追加
-  → 手動記録と同じイベント形式で追加する方針
-- 週次・月次サマリ（分析ではなく「眺め」）
-- オプトインの集合統計（明示同意のみ）
+- ゲームログ以外の自動取得（Git コミット、外部サービス、各種ログ）を共通イベント形式に載せる
+- ローカル中心のまま運用しやすくするためのインフラ化を進める
+- 週次・月次の眺め、表示圧縮、必要最小限の通知などを実データに合わせて足す
+- オプトイン前提の外部連携や集計は、ローカル運用の価値を損なわない範囲でのみ検討する
 
 ---
 
@@ -182,7 +186,9 @@ diff AI_GUIDE.md src/personal_mcp/AI_GUIDE.md
 ```
 src/personal_mcp/
 ├── server.py               # CLIエントリーポイント
-├── tools/poe2_log.py       # PoE2ログ記録・一覧
+├── tools/event.py          # 共通イベント記録・一覧
+├── tools/poe2_log.py       # 旧PoE2ログ互換レイヤ
+├── tools/poe2_client_watcher.py  # PoE2 Client.txt 監視
 ├── storage/jsonl.py        # 追記型JSONLストレージ
 ├── adapters/mcp_server.py  # MCP system context adapter
 └── core/guide.py           # AI_GUIDE.md ローダー
@@ -191,7 +197,7 @@ src/personal_mcp/
 **貢献の歓迎範囲：**
 
 - バグ修正・型エラー修正
-- テストの追加（現在なし）
+- テストの追加・改善
 - ドキュメントの改善
 
 機能追加は事前にIssueで議論してください。
