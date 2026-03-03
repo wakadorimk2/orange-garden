@@ -107,7 +107,15 @@ def test_env_var_data_dir_is_used(tmp_path: Path) -> None:
     env_dir = tmp_path / "env_data"
 
     subprocess.run(
-        [sys.executable, "-m", "personal_mcp.server", "event-add", "env test", "--domain", "general"],
+        [
+            sys.executable,
+            "-m",
+            "personal_mcp.server",
+            "event-add",
+            "env test",
+            "--domain",
+            "general",
+        ],
         capture_output=True,
         text=True,
         check=True,
