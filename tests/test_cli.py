@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -102,6 +103,46 @@ def test_event_add_rejects_disallowed_domain_without_creating_file(tmp_path: Pat
     assert not events_path.exists()
 
 
+def test_env_var_data_dir_is_used(tmp_path: Path) -> None:
+    env_dir = tmp_path / "env_data"
+
+    subprocess.run(
+        [sys.executable, "-m", "personal_mcp.server", "event-add", "env test", "--domain", "general"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "PERSONAL_MCP_DATA_DIR": str(env_dir)},
+    )
+
+    assert (env_dir / "events.jsonl").exists()
+
+
+def test_explicit_data_dir_overrides_env_var(tmp_path: Path) -> None:
+    env_dir = tmp_path / "env_data"
+    explicit_dir = tmp_path / "explicit_data"
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "personal_mcp.server",
+            "event-add",
+            "explicit test",
+            "--domain",
+            "general",
+            "--data-dir",
+            str(explicit_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "PERSONAL_MCP_DATA_DIR": str(env_dir)},
+    )
+
+    assert (explicit_dir / "events.jsonl").exists()
+    assert not (env_dir / "events.jsonl").exists()
+
+
 # ---------------------------------------------------------------------------
 # 2. mood-add → event-list --domain mood
 # ---------------------------------------------------------------------------
@@ -148,7 +189,7 @@ def test_mood_add_append_only(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. poe2-log-add → data/events.jsonl への追記
+# 3. poe2-log-add → events.jsonl への追記
 #    (data/poe2/logs.jsonl は廃止済みのため events.jsonl のみを検証)
 # ---------------------------------------------------------------------------
 
