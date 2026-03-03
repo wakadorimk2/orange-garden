@@ -11,14 +11,21 @@ from personal_mcp.tools.event import event_add
 
 _SCENE_RE = re.compile(r"\[SCENE\] Set Source \[([^\]]+)\]")
 
+# PoE2 emits these literals during area loading transitions (not real area names).
+_NOISE_AREAS: frozenset[str] = frozenset({"(null)", "(unknown)"})
+
 
 def parse_area_line(line: str) -> Optional[str]:
     """Extract area name from a Client.txt [SCENE] line.
 
-    Returns the area name string if the line matches, otherwise None.
+    Returns the area name string if the line matches and is not a transient
+    loading state, otherwise None.
     """
     m = _SCENE_RE.search(line)
-    return m.group(1) if m else None
+    if not m:
+        return None
+    area = m.group(1)
+    return None if area in _NOISE_AREAS else area
 
 
 def watch_client_log(
