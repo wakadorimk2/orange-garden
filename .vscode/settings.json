@@ -1,0 +1,6 @@
+{
+  "terminal.integrated.profiles.linux": {
+    "Claude": { "path": "bash", "env": { "TERM_ROLE": "CLAUDE" } },
+    "Codex":  { "path": "bash", "env": { "TERM_ROLE": "CODEX" } }
+  }
+}
