@@ -61,13 +61,19 @@ python -m personal_mcp.server poe2-log-add "アトラスの外縁でボス撃破
 python -m personal_mcp.server poe2-watch --client-log /path/to/Client.txt
 ```
 
-イベントは `data/events.jsonl` に追記されます（削除・書き換えは不可）。`poe2-log-*` は互換用の入口で、保存先も共通イベントストアです。
+イベントはデータディレクトリ内の `events.jsonl` に追記されます（削除・書き換えは不可）。既定保存先は `~/.local/share/personal-mcp/` です。`poe2-log-*` は互換用の入口で、保存先も共通イベントストアです。
 
 ---
 
 ## データモデル方針
 
-イベントは共通 JSONL 形式（`data/events.jsonl`）で表現する。追記のみ。編集・削除はしない。
+イベントは共通 JSONL 形式（`<data-dir>/events.jsonl`）で表現する。追記のみ。編集・削除はしない。
+
+### データ保存先
+
+- 優先順位は `--data-dir`、`PERSONAL_MCP_DATA_DIR`、XDG 既定の順
+- XDG 既定は `~/.local/share/personal-mcp/`
+- `repo/data/` は開発・テスト・例示用であり、実運用データの正本ではない
 
 ### 最小イベント契約
 
@@ -209,13 +215,13 @@ python -m personal_mcp.server poe2-watch --client-log /path/to/Client.txt
 - 共通イベント追加 (`event-add`)
 - 日次タイムライン一覧 (`event-list` / `event-today`)
 - 気分記録 (`mood-add`)
-- 単一保存先 (`data/events.jsonl`)
+- 単一保存先（`<data-dir>/events.jsonl`）
 - 代表ユースケースとしての PoE2 記録 (`poe2-log-*` / `poe2-watch`)
 
 ### Now
 
 - CLI ベースの観測フローは動いており、MVP の必須要素は揃っている
-- 保存形式は `data/events.jsonl` に統一され、PoE2 も mood も同じイベント形式で追記される
+- 保存形式は `events.jsonl` に統一され、PoE2 も mood も同じイベント形式で追記される
 - PoE2 では手動記録に加えて `Client.txt` 監視による自動記録も最小実装されている
 
 ### Next
@@ -248,7 +254,7 @@ python -m personal_mcp.server poe2-watch --client-log /path/to/Client.txt
 
 ### 保証するもの
 
-- **JSONL イベント形式**（`data/events.jsonl` のフィールド定義）
+- **JSONL イベント形式**（`<data-dir>/events.jsonl` のフィールド定義）
   - 破壊的変更を行う場合は `schema_version` フィールドを追加し、ワンタイム移行スクリプトを同伴する
 
 ### 保証しないもの
