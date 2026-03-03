@@ -6,12 +6,20 @@ import json
 from typing import Any, Dict, List, Optional
 
 from personal_mcp.adapters.mcp_server import get_system_context
+from personal_mcp.tools.event import event_add
 from personal_mcp.tools.poe2_log import log_add, log_list
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="personal-mcp")
     sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_event = sub.add_parser("event-add", help="append an event to data/events.jsonl")
+    p_event.add_argument("text", help="event text")
+    p_event.add_argument("--domain", required=True, help="event domain (e.g. poe2, mood)")
+    p_event.add_argument("--tags", default="")
+    p_event.add_argument("--meta-json", default=None)
+    p_event.add_argument("--data-dir", default="data")
 
     p_log = sub.add_parser("poe2-log-add", help="append a poe2 log entry")
     p_log.add_argument("text", help="log text")
@@ -30,6 +38,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_list.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
+
+    if args.cmd == "event-add":
+        tags = [t for t in args.tags.split(",") if t] if args.tags else []
+        meta: Optional[Dict[str, Any]] = json.loads(args.meta_json) if args.meta_json else None
+        rec = event_add(
+            domain=args.domain,
+            text=args.text,
+            tags=tags,
+            meta=meta,
+            data_dir=args.data_dir,
+        )
+        print(json.dumps(rec, ensure_ascii=False, indent=2))
+        return 0
 
     if args.cmd == "info":
         text = get_system_context()
