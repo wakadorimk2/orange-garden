@@ -51,6 +51,10 @@ Persistent storage (daily logs, habit data, game state) belongs in
 `src/personal_mcp/storage/`. Design the data model in `docs/data-flow.md` first,
 then implement.
 
+Data-dir resolution is a CLI concern in `src/personal_mcp/server.py`.
+Resolution order is `--data-dir`, `PERSONAL_MCP_DATA_DIR`, then the XDG default.
+Tool-layer functions receive a resolved `data_dir` and do not interpret env vars or XDG.
+
 ## Skills layer
 
 Skills define how AI agents interact with this repository.

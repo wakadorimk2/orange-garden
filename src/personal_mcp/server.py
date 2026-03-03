@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime
+import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from personal_mcp.adapters.mcp_server import get_system_context
@@ -61,34 +63,45 @@ def _print_event_timeline(records: List[Dict[str, Any]]) -> None:
             print(f"{t} [{dom}] {text}")
 
 
+def _resolve_data_dir(explicit: Optional[str]) -> str:
+    if explicit:
+        return explicit
+    env = os.environ.get("PERSONAL_MCP_DATA_DIR")
+    if env:
+        return env
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+    return str(base / "personal-mcp")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="personal-mcp")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_event = sub.add_parser("event-add", help="append an event to data/events.jsonl")
+    p_event = sub.add_parser("event-add", help="append an event to <data-dir>/events.jsonl")
     p_event.add_argument("text", help="event text")
     p_event.add_argument("--domain", required=True, help="event domain (e.g. poe2, mood)")
     p_event.add_argument("--tags", default="")
     p_event.add_argument("--meta-json", default=None)
-    p_event.add_argument("--data-dir", default="data")
+    p_event.add_argument("--data-dir", default=None)
 
-    p_elist = sub.add_parser("event-list", help="list events from data/events.jsonl")
+    p_elist = sub.add_parser("event-list", help="list events from <data-dir>/events.jsonl")
     p_elist.add_argument("--n", type=int, default=20)
     p_elist.add_argument("--domain", default=None)
     p_elist.add_argument("--date", default=None, metavar="YYYY-MM-DD")
     p_elist.add_argument("--since", default=None)
-    p_elist.add_argument("--data-dir", default="data")
+    p_elist.add_argument("--data-dir", default=None)
     p_elist.add_argument("--json", action="store_true")
 
     p_etoday = sub.add_parser("event-today", help="list today's events")
     p_etoday.add_argument("--domain", default=None)
-    p_etoday.add_argument("--data-dir", default="data")
+    p_etoday.add_argument("--data-dir", default=None)
     p_etoday.add_argument("--json", action="store_true")
 
-    p_mood = sub.add_parser("mood-add", help="append a mood event to data/events.jsonl")
+    p_mood = sub.add_parser("mood-add", help="append a mood event to <data-dir>/events.jsonl")
     p_mood.add_argument("text", help="mood text")
     p_mood.add_argument("--tags", default="")
-    p_mood.add_argument("--data-dir", default="data")
+    p_mood.add_argument("--data-dir", default=None)
 
     p_log = sub.add_parser(
         "poe2-log-add", help="append a poe2 log entry"
@@ -97,7 +110,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_log.add_argument("--kind", default="note")
     p_log.add_argument("--tags", default="")
     p_log.add_argument("--meta-json", default="{}")
-    p_log.add_argument("--data-dir", default="data")
+    p_log.add_argument("--data-dir", default=None)
 
     p_watch = sub.add_parser("poe2-watch", help="tail Client.txt and record area transitions")
     p_watch.add_argument(
@@ -106,7 +119,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         metavar="PATH",
         help="path to Client.txt (overrides POE2_CLIENT_LOG env var)",
     )
-    p_watch.add_argument("--data-dir", default="data")
+    p_watch.add_argument("--data-dir", default=None)
 
     # src/personal_mcp/server.py の subcommand 追加分だけ（イメージ）
     p_list = sub.add_parser(
@@ -116,17 +129,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_list.add_argument("--kind", default=None)
     p_list.add_argument("--tag", default=None)
     p_list.add_argument("--since", default=None)
-    p_list.add_argument("--data-dir", default="data")
+    p_list.add_argument("--data-dir", default=None)
     p_list.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
+    data_dir = _resolve_data_dir(getattr(args, "data_dir", None))
 
     if args.cmd == "event-today":
         today = datetime.now().astimezone().strftime("%Y-%m-%d")
         records = event_list(
             date=today,
             domain=args.domain,
-            data_dir=args.data_dir,
+            data_dir=data_dir,
         )
         if args.json:
             print(json.dumps(records, ensure_ascii=False, indent=2))
@@ -140,7 +154,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             domain=args.domain,
             date=args.date,
             since=args.since,
-            data_dir=args.data_dir,
+            data_dir=data_dir,
         )
         if args.json:
             print(json.dumps(records, ensure_ascii=False, indent=2))
@@ -156,7 +170,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             text=args.text,
             tags=tags,
             meta=meta,
-            data_dir=args.data_dir,
+            data_dir=data_dir,
         )
         print(json.dumps(rec, ensure_ascii=False, indent=2))
         return 0
@@ -172,7 +186,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             domain="mood",
             text=args.text,
             tags=tags,
-            data_dir=args.data_dir,
+            data_dir=data_dir,
         )
         print(json.dumps(rec, ensure_ascii=False, indent=2))
         return 0
@@ -186,20 +200,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             text=args.text,
             tags=tags,
             meta=meta,
-            data_dir=args.data_dir,
+            data_dir=data_dir,
         )
         print(json.dumps(rec, ensure_ascii=False, indent=2))
         return 0
 
     if args.cmd == "poe2-watch":
-        import os
-        from pathlib import Path
-
         client_log = args.client_log or os.environ.get("POE2_CLIENT_LOG")
         if not client_log:
             print("error: --client-log or POE2_CLIENT_LOG must be set", flush=True)
             return 1
-        watch_client_log(Path(client_log), data_dir=args.data_dir)
+        watch_client_log(Path(client_log), data_dir=data_dir)
         return 0
 
     if args.cmd == "poe2-log-list":
@@ -207,7 +218,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             domain="poe2",
             n=args.n,
             since=args.since,
-            data_dir=args.data_dir,
+            data_dir=data_dir,
         )
         if args.kind:
             rows = [

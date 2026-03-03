@@ -21,3 +21,12 @@
 ## 本リポジトリでの現状
 
 本リポジトリでは `data/poe2/logs.jsonl` に実運用データは存在しないため、当該ファイルは削除した。
+
+## ローカル正本の保存先変更
+
+- 旧: `data/events.jsonl`（repo 内の相対パス）
+- 新: XDG 既定の `~/.local/share/personal-mcp/events.jsonl`
+- 優先順位: `--data-dir` > `PERSONAL_MCP_DATA_DIR` > XDG 既定
+
+`repo/data/` は開発・テスト・例示用であり、実運用データの正本ではない。
+既存の `data/events.jsonl` を使い続ける場合は `--data-dir data` を明示指定する。
