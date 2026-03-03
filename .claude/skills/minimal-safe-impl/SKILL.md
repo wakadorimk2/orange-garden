@@ -10,18 +10,15 @@ disable-model-invocation: true
 > このファイルは Claude Code 用のアダプタです。
 > **正本（AI非依存）**: [`docs/skills/minimal-safe-impl.md`](../../../docs/skills/minimal-safe-impl.md)
 >
-> Mission / Rules / Output テンプレは正本を参照してください。
-> このファイルには Claude 固有の制約・呼び出し方法のみ記載します。
+> 振る舞い・Rules・Procedure・Output テンプレは正本を参照してください。
+> このファイルには Claude 固有の呼び出し構文と引数だけを記載します。
 
 ---
 
-## Claude 固有の制約
+## Claude 固有の呼び出し
 
 - 入力は `$ARGUMENTS`（issue番号 / URL / 実装依頼文）
-- Issue がある場合は先に本文から Goal / Scope / 完了条件を取得する
-- 近い既存実装を確認し、構造と CLI パターンを揃えてから編集する
-- README / AI_GUIDE の MVP 互換性ポリシーと矛盾する互換レイヤは追加しない
-- データ形式変更が必要なら `schema_version` とワンタイム移行スクリプト要否を必ず確認する
+- 実装前に必ず正本を読む
 
 ## Invocation Examples
 
