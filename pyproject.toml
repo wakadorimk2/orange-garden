@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dev = [
     "ruff>=0.3",
     "pytest>=8.0",
-    ]
+]
 
 [project.scripts]
 personal-mcp = "personal_mcp.server:main"
@@ -28,3 +28,10 @@ personal_mcp = ["AI_GUIDE.md"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+# E: pycodestyle errors, F: pyflakes — minimal set, no docstring/type enforcement
+select = ["E", "F"]
+
+[tool.ruff.format]
+quote-style = "double"
