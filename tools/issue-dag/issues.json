@@ -1,0 +1,245 @@
+{
+  "repo": "wakadorimk2/personal-mcp-core",
+  "issue_numbers": [
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80
+  ],
+  "issues": [
+    {
+      "number": 70,
+      "title": "docs: worklog domain の最小イベント契約を定義する",
+      "blockedBy": [
+        {
+          "number": 74,
+          "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する"
+        },
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 76,
+          "title": "docs: 仕事イベントを worklog へ収める運用境界を定義する"
+        }
+      ]
+    },
+    {
+      "number": 71,
+      "title": "docs: eng domain の最小イベント契約を定義する",
+      "blockedBy": [
+        {
+          "number": 74,
+          "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する"
+        },
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 76,
+          "title": "docs: 仕事イベントを worklog へ収める運用境界を定義する"
+        }
+      ]
+    },
+    {
+      "number": 72,
+      "title": "docs: 転活・仕事ログの最小秘匿ルールを定義する",
+      "blockedBy": [
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        },
+        {
+          "number": 78,
+          "title": "docs: career domain の最小イベント契約を定義する"
+        }
+      ],
+      "blocking": []
+    },
+    {
+      "number": 73,
+      "title": "docs: art domain の最小イベント契約を定義する",
+      "blockedBy": [
+        {
+          "number": 74,
+          "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する"
+        },
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": []
+    },
+    {
+      "number": 74,
+      "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する",
+      "blockedBy": [
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 70,
+          "title": "docs: worklog domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 71,
+          "title": "docs: eng domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 73,
+          "title": "docs: art domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 75,
+          "title": "docs: game domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 78,
+          "title": "docs: career domain の最小イベント契約を定義する"
+        }
+      ]
+    },
+    {
+      "number": 75,
+      "title": "docs: game domain の最小イベント契約を定義する",
+      "blockedBy": [
+        {
+          "number": 74,
+          "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する"
+        },
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": []
+    },
+    {
+      "number": 76,
+      "title": "docs: 仕事イベントを worklog へ収める運用境界を定義する",
+      "blockedBy": [
+        {
+          "number": 70,
+          "title": "docs: worklog domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 71,
+          "title": "docs: eng domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": []
+    },
+    {
+      "number": 77,
+      "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する",
+      "blockedBy": [
+        {
+          "number": 80,
+          "title": "Define kind taxonomy v1 as a cross-domain event type axis"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 70,
+          "title": "docs: worklog domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 71,
+          "title": "docs: eng domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 72,
+          "title": "docs: 転活・仕事ログの最小秘匿ルールを定義する"
+        },
+        {
+          "number": 73,
+          "title": "docs: art domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 74,
+          "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する"
+        },
+        {
+          "number": 75,
+          "title": "docs: game domain の最小イベント契約を定義する"
+        },
+        {
+          "number": 76,
+          "title": "docs: 仕事イベントを worklog へ収める運用境界を定義する"
+        },
+        {
+          "number": 78,
+          "title": "docs: career domain の最小イベント契約を定義する"
+        }
+      ]
+    },
+    {
+      "number": 78,
+      "title": "docs: career domain の最小イベント契約を定義する",
+      "blockedBy": [
+        {
+          "number": 74,
+          "title": "docs: 新 domain 追加時の受け入れチェックリストを定義する"
+        },
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 72,
+          "title": "docs: 転活・仕事ログの最小秘匿ルールを定義する"
+        }
+      ]
+    },
+    {
+      "number": 79,
+      "title": "docs: define Event Contract v1 for JSONL events",
+      "blockedBy": [],
+      "blocking": [
+        {
+          "number": 80,
+          "title": "Define kind taxonomy v1 as a cross-domain event type axis"
+        }
+      ]
+    },
+    {
+      "number": 80,
+      "title": "Define kind taxonomy v1 as a cross-domain event type axis",
+      "blockedBy": [
+        {
+          "number": 79,
+          "title": "docs: define Event Contract v1 for JSONL events"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 77,
+          "title": "docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"
+        }
+      ]
+    }
+  ]
+}

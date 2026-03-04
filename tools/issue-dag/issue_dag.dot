@@ -1,0 +1,37 @@
+digraph issue_dag {
+  graph [rankdir=LR, label="Issue dependency DAG", labelloc=t, fontsize=18];
+  node [shape=box, style="rounded", fontname="Helvetica"];
+  edge [fontname="Helvetica"];
+
+  // A -> B means A blocks B.
+  issue_70 [label="#70 docs: worklog domain の最小イベント契約を定義する"];
+  issue_71 [label="#71 docs: eng domain の最小イベント契約を定義する"];
+  issue_72 [label="#72 docs: 転活・仕事ログの最小秘匿ルールを定義する"];
+  issue_73 [label="#73 docs: art domain の最小イベント契約を定義する"];
+  issue_74 [label="#74 docs: 新 domain 追加時の受け入れチェックリストを定義する"];
+  issue_75 [label="#75 docs: game domain の最小イベント契約を定義する"];
+  issue_76 [label="#76 docs: 仕事イベントを worklog へ収める運用境界を定義する"];
+  issue_77 [label="#77 docs: domain 拡張の最小ポリシーと allowlist 追加条件を定義する"];
+  issue_78 [label="#78 docs: career domain の最小イベント契約を定義する"];
+  issue_79 [label="#79 docs: define Event Contract v1 for JSONL events"];
+  issue_80 [label="#80 Define kind taxonomy v1 as a cross-domain event t..."];
+
+  issue_70 -> issue_76;
+  issue_71 -> issue_76;
+  issue_74 -> issue_70;
+  issue_74 -> issue_71;
+  issue_74 -> issue_73;
+  issue_74 -> issue_75;
+  issue_74 -> issue_78;
+  issue_77 -> issue_70;
+  issue_77 -> issue_71;
+  issue_77 -> issue_72;
+  issue_77 -> issue_73;
+  issue_77 -> issue_74;
+  issue_77 -> issue_75;
+  issue_77 -> issue_76;
+  issue_77 -> issue_78;
+  issue_78 -> issue_72;
+  issue_79 -> issue_80;
+  issue_80 -> issue_77;
+}
