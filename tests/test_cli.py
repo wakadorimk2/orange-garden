@@ -39,10 +39,7 @@ def _repo_data_jsonl_snapshot() -> dict[Path, str]:
     repo_data_dir = _repo_root() / "data"
     if not repo_data_dir.exists():
         return {}
-    return {
-        path: path.read_text(encoding="utf-8")
-        for path in repo_data_dir.rglob("*.jsonl")
-    }
+    return {path: path.read_text(encoding="utf-8") for path in repo_data_dir.rglob("*.jsonl")}
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +129,10 @@ def test_env_var_data_dir_is_used(tmp_path: Path) -> None:
     before = _repo_data_jsonl_snapshot()
 
     _run(
-        "event-add", "env test", "--domain", "general",
+        "event-add",
+        "env test",
+        "--domain",
+        "general",
         env={**os.environ, "PERSONAL_MCP_DATA_DIR": str(env_dir)},
     )
 
@@ -155,7 +155,12 @@ def test_explicit_data_dir_overrides_env_var(tmp_path: Path) -> None:
     before = _repo_data_jsonl_snapshot()
 
     _run(
-        "event-add", "explicit test", "--domain", "general", "--data-dir", str(explicit_dir),
+        "event-add",
+        "explicit test",
+        "--domain",
+        "general",
+        "--data-dir",
+        str(explicit_dir),
         env={**os.environ, "PERSONAL_MCP_DATA_DIR": str(env_dir)},
     )
 
