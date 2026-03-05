@@ -115,8 +115,8 @@ external requirements. The placeholder prints context length to verify the load 
 
 ## Event schema
 
-> Defined in `src/personal_mcp/core/event.py`.
-> Current status: **schema definition only** — no write logic is implemented here.
+> Builder: `src/personal_mcp/core/event.py` (`build_v1_record`).
+> Issue #100 で writer migration を実施し、v1 record への移行を進めた。
 
 ### Purpose
 
@@ -124,40 +124,42 @@ All domains (poe2, mood, general, eng, worklog) converge to a single `Event` typ
 
 - Storage code (`append_jsonl`) needs no domain-specific branches.
 - History can be reconstructed from JSONL files alone, without domain knowledge.
-- Future adapters can filter or aggregate events using the common `domain` and `tags` fields.
+- Future adapters can filter or aggregate events using the common `domain` and optional `tags` fields.
 
-### Fields
+### v1 record fields
 
-| Field     | Type              | Description                                              |
-|-----------|-------------------|----------------------------------------------------------|
-| `ts`      | `str`             | ISO 8601 timestamp (UTC recommended)                     |
-| `domain`  | `str`             | Source domain — MVP supported: `"poe2"`, `"mood"`, `"general"`, `"eng"`, `"worklog"` |
-| `payload` | `Dict[str, Any]`  | Domain-specific data; all values must be JSON-serializable |
-| `tags`    | `List[str]`       | Optional labels for filtering; use `[]` if not needed    |
+| Field    | Type              | Description                                                                                      |
+|----------|-------------------|--------------------------------------------------------------------------------------------------|
+| `v`      | `int`             | Schema version. Always `1` for new records                                                       |
+| `ts`     | `str`             | ISO 8601 timestamp with timezone offset (UTC recommended)                                        |
+| `domain` | `str`             | Source domain — MVP: `"poe2"`, `"mood"`, `"general"`, `"eng"`, `"worklog"`                      |
+| `kind`   | `str`             | Event kind (`"note"`, `"session"`, `"milestone"`, etc.). Required by v1 contract |
+| `data`   | `Dict[str, Any]`  | Domain-specific data; `data.text` is the canonical text field                                    |
+| `tags`   | `List[str]`       | Optional labels for filtering                                                                    |
+| `source` | `str`             | Optional. Data origin (`"manual"`, `"watcher"`, etc.)                                            |
+| `ref`    | `str`             | Optional. Reference to issue number or external ID                                               |
 
 ### JSONL example
 
 ```python
-from dataclasses import asdict
-from personal_mcp.core.event import Event
+from personal_mcp.core.event import build_v1_record
 
-event = Event(
+record = build_v1_record(
     ts="2026-03-04T11:00:00+00:00",
     domain="eng",
-    payload={"text": "JSONL append-only方針を確認", "meta": {"kind": "milestone"}},
+    text="JSONL append-only方針を確認",
     tags=["schema"],
+    kind="milestone",
 )
-
-asdict(event)
 # {
+#   "v": 1,
 #   "ts": "2026-03-04T11:00:00+00:00",
 #   "domain": "eng",
-#   "payload": {"text": "JSONL append-only方針を確認", "meta": {"kind": "milestone"}},
+#   "kind": "milestone",
+#   "data": {"text": "JSONL append-only方針を確認"},
 #   "tags": ["schema"]
 # }
 ```
 
-`kind` はトップレベルの `payload` に置かず、`payload.meta.kind` に入れる。
-`payload.meta` 自体は省略可能（`poe2-watch` による自動記録など）。
-
-`asdict(event)` の結果はそのまま `append_jsonl(path, asdict(event))` に渡せる。
+`build_v1_record` の結果はそのまま `append_jsonl(path, record)` に渡せる。
+legacy record（`payload` 形式）は `read_jsonl` が読み込み時に v1 形状へ正規化する（`storage/jsonl.py:_normalize_event_record`）。
