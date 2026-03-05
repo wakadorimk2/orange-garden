@@ -72,6 +72,15 @@ def build_edge_list(edges: set[tuple[int, int]]) -> str:
     return "\n".join(f"#{src} -> #{dst}" for src, dst in sorted(edges))
 
 
+def build_edge_list_with_title(issues: list[dict], edges: set[tuple[int, int]]) -> str:
+    """Build edge list with issue titles for quick overview on CLI."""
+    title_by_number = {issue["number"]: (issue.get("title") or "") for issue in issues}
+    return "\n".join(
+        f"#{src} ({title_by_number.get(src, '')}) -> #{dst} ({title_by_number.get(dst, '')})"
+        for src, dst in sorted(edges)
+    )
+
+
 def render_png(dot_path: Path, png_path: Path) -> None:
     """Render dot_path to png_path via graphviz dot.
 
@@ -119,6 +128,11 @@ def main() -> None:
         action="store_true",
         help="Print copy-friendly edge list to stdout (#src -> #dst)",
     )
+    parser.add_argument(
+        "--list-with-title",
+        action="store_true",
+        help="Print edge list with issue titles for quick overview",
+    )
     args = parser.parse_args()
 
     if args.input:
@@ -140,7 +154,9 @@ def main() -> None:
     mmd_path.write_text(build_mmd(issues, edges))
     print(f"Written: {mmd_path}")
 
-    if args.list:
+    if args.list_with_title:
+        print(build_edge_list_with_title(issues, edges))
+    elif args.list:
         print(build_edge_list(edges))
 
     if args.png:

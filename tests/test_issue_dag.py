@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from issue_dag import (  # noqa: E402
     _escape_label,
     build_edge_list,
+    build_edge_list_with_title,
     build_dot,
     build_mmd,
     extract_edges,
@@ -93,6 +94,20 @@ def test_build_edge_list_structure() -> None:
     edges = {(3, 1), (3, 2), (4, 3)}
     result = build_edge_list(edges)
     assert result.splitlines() == ["#3 -> #1", "#3 -> #2", "#4 -> #3"]
+
+
+def test_build_edge_list_with_title_structure() -> None:
+    issues = [
+        {"number": 1, "title": "Alpha", "body": ""},
+        {"number": 2, "title": "Beta", "body": ""},
+        {"number": 3, "title": "Gamma", "body": ""},
+    ]
+    edges = {(3, 1), (3, 2)}
+    result = build_edge_list_with_title(issues, edges)
+    assert result.splitlines() == [
+        "#3 (Gamma) -> #1 (Alpha)",
+        "#3 (Gamma) -> #2 (Beta)",
+    ]
 
 
 def test_escape_label_double_quote() -> None:
