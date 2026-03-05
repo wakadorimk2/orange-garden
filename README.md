@@ -77,21 +77,22 @@ python -m personal_mcp.server poe2-watch --client-log /path/to/Client.txt
 - `repo/data/` に実ユーザーログ・バックアップ・復元成果物を置かない
 - 詳細な運用ルールは [`docs/data-directory.md`](./docs/data-directory.md) を参照
 
-### 最小イベント契約
+### v1 record フィールド契約
+
+イベントの保存契約は [Event Contract v1](./docs/event-contract-v1.md) に従う。
 
 | フィールド | 必須/推奨 | 説明 |
 | --- | --- | --- |
+| `v` | 必須 | schema バージョン（`1` 固定） |
 | `ts` | 必須 | タイムスタンプ（ISO 8601 タイムゾーン付き）。内部保存は UTC を原則とする |
 | `domain` | 必須 | ドメイン識別子（下記 MVP 許可リストを参照） |
-| `payload.text` | 必須 | 記録本文 |
-| `tags` | 必須 | タグリスト（空配列可） |
-| `payload.meta.kind` | 推奨 | イベント種別（`note` / `session` / `milestone` など） |
-| `payload.meta.source` | 推奨 | データ取得元（`"manual"` など） |
-| `payload.meta.ref` | 推奨 | 参照先（Issue 番号など） |
+| `kind` | 必須 | イベント種別（`note` / `session` / `milestone` など）。[kind taxonomy](./docs/kind-taxonomy-v1.md) を参照 |
+| `data` | 必須 | ドメイン固有データ。本文は原則 `data.text`（無い場合は best-effort で扱う） |
+| `tags` | 推奨 | タグリスト（省略可） |
+| `source` | 推奨 | データ取得元（`"manual"` など） |
+| `ref` | 推奨 | 参照先（Issue 番号など） |
 
-`payload.meta` ごと省略できる（`poe2-watch` による自動記録など）。新しいトップレベルフィールドは追加しない。
-
-Issue #79 では、目標契約として `v` / `kind` / `data` を持つ Event Contract v1 を別文書で定義している。現行保存形式はまだその契約に未準拠な legacy record なので、差分と対応方針は [docs/event-contract-v1.md](./docs/event-contract-v1.md) を参照。
+> **注記**: 既存 JSONL に残る legacy record（`payload` 形式）との対応方針は [docs/event-contract-v1.md](./docs/event-contract-v1.md) の mapping / tolerance を参照。
 
 ### タイムスタンプ方針
 
@@ -120,7 +121,7 @@ Issue #79 では、目標契約として `v` / `kind` / `data` を持つ Event C
 
 ### eng / worklog の最小 kind セット
 
-`payload.meta.kind` に設定する推奨値（`eng` / `worklog` 向け）：
+`kind` フィールドの推奨値（`eng` / `worklog` 向け）：
 
 | kind | 用途 |
 | --- | --- |
@@ -134,16 +135,15 @@ Issue #79 では、目標契約として `v` / `kind` / `data` を持つ Event C
 
 ```json
 {
+  "v": 1,
   "ts": "2026-03-04T18:00:00+09:00",
   "domain": "eng",
-  "payload": {
-    "text": "MCP adapterの調査メモ",
-    "meta": {
-      "kind": "note",
-      "source": "manual"
-    }
+  "kind": "note",
+  "data": {
+    "text": "MCP adapterの調査メモ"
   },
-  "tags": ["research"]
+  "tags": ["research"],
+  "source": "manual"
 }
 ```
 
@@ -151,16 +151,15 @@ Issue #79 では、目標契約として `v` / `kind` / `data` を持つ Event C
 
 ```json
 {
+  "v": 1,
   "ts": "2026-03-04T19:00:00+09:00",
   "domain": "worklog",
-  "payload": {
-    "text": "Issue #23の切り分け",
-    "meta": {
-      "kind": "session",
-      "ref": "#23"
-    }
+  "kind": "session",
+  "data": {
+    "text": "Issue #23の切り分け"
   },
-  "tags": ["debug"]
+  "tags": ["debug"],
+  "ref": "#23"
 }
 ```
 
@@ -168,13 +167,12 @@ Issue #79 では、目標契約として `v` / `kind` / `data` を持つ Event C
 
 ```json
 {
+  "v": 1,
   "ts": "2026-03-04T20:00:00+09:00",
   "domain": "eng",
-  "payload": {
-    "text": "JSONL append-only方針を確認",
-    "meta": {
-      "kind": "milestone"
-    }
+  "kind": "milestone",
+  "data": {
+    "text": "JSONL append-only方針を確認"
   },
   "tags": ["schema"]
 }
@@ -184,16 +182,15 @@ Issue #79 では、目標契約として `v` / `kind` / `data` を持つ Event C
 
 ```json
 {
+  "v": 1,
   "ts": "2026-03-04T21:00:00+09:00",
   "domain": "worklog",
-  "payload": {
-    "text": "レビュー前に再現手順を整理",
-    "meta": {
-      "kind": "note",
-      "source": "manual"
-    }
+  "kind": "note",
+  "data": {
+    "text": "レビュー前に再現手順を整理"
   },
-  "tags": ["review"]
+  "tags": ["review"],
+  "source": "manual"
 }
 ```
 
