@@ -2,7 +2,7 @@
 
 > 種別: 調査・提案（実装前）
 > 対象 Issue: #120
-> 更新日: 2026-03-05
+> 更新日: 2026-03-06（Issue #131 調査反映）
 
 ---
 
@@ -56,31 +56,37 @@
 |------|------|
 | 取得元 | npm パッケージ `ccusage`（任意インストール） |
 | コマンド例 | `ccusage daily --json` または `npx ccusage@latest` |
-| 出力形式 | JSON（日別トークン集計、モデル別内訳を含む可能性あり） |
+| 出力形式 | JSON（`daily[]`, `totals`, `daily[].modelBreakdowns[]` を確認） |
 | 更新方法 | 5 分ごとにコマンド実行、結果を parse して表示 |
 | 依存 | Node.js / npm が必要（モニター本体の依存ではない） |
 | 長所 | 集計ロジック外部化、edge case 処理済み |
 | 短所 | 外部依存、出力 schema が変更される可能性あり |
 
-**不確実点:**
-- `--json` フラグの有無と正確な出力 schema は未確認（要手元で `ccusage --help` 確認）
-- 当日フィルタのフラグ名（`--today` / `--date` 等）は未確認
+**検証結果（2026-03-06）:**
+- `ccusage --help` / `ccusage daily --help` で `--json` が利用可能であることを確認
+- 当日指定専用フラグ（`--today`）は確認できず、`--since YYYYMMDD` + `--until YYYYMMDD` の併用が日次絞り込み手段
+- `npx --yes ccusage@latest daily --since <today> --until <today> --json --offline` で JSON 出力を確認
+- 出力主要フィールド: `inputTokens`, `outputTokens`, `cacheCreationTokens`, `cacheReadTokens`, `totalTokens`, `modelBreakdowns[].modelName`
 
 #### A-2: `~/.claude/projects/` 直接読取（標準フォールバック）
 
 | 項目 | 内容 |
 |------|------|
 | 取得元 | `~/.claude/projects/<hash>/*.jsonl` |
-| データ形式 | JSONL 各行に `message.usage.{input_tokens, output_tokens}` を含む |
+| データ形式 | JSONL。`type=="assistant"` 行で `message.model` と `message.usage.*` を確認 |
 | 更新方法 | 5 分ごとにファイルを glob して当日タイムスタンプのレコードを集計 |
 | 依存 | Python 標準ライブラリのみ（`json`, `glob`, `datetime`） |
 | 長所 | 外部依存なし、ccusage 不在でも動作する |
 | 短所 | ファイル形式が非公式・変更リスクあり、glob 対象が多いと遅い |
 
-**不確実点:**
-- JSONL の正確なフィールド構造は Claude Code バージョンで異なる可能性あり
-- モデル名のフィールドパス（`message.model` 等）が安定しているか未確認
-- キャッシュトークン（`cache_read_input_tokens` 等）の扱いは要方針決定
+**検証結果（2026-03-06）:**
+- パス実在確認: `~/.claude/projects/-home-wakadori-personal-mcp-core/*.jsonl`
+- 集計に使える主要フィールド（assistant 行）:
+  - 日付判定: top-level `timestamp`（ISO8601）
+  - モデル別: `message.model`
+  - トークン: `message.usage.input_tokens`, `message.usage.output_tokens`
+  - キャッシュ: `message.usage.cache_creation_input_tokens`, `message.usage.cache_read_input_tokens`
+- 1 ファイル内に複数 `type`（`user`, `assistant`, `system`, `file-history-snapshot`, `last-prompt`）が混在するため、`assistant` 行のみを集計対象にする必要あり
 
 ---
 
@@ -90,17 +96,18 @@
 
 | 項目 | 内容 |
 |------|------|
-| 取得元 | `~/.codex/` 配下のセッションログ（存在する場合） |
-| データ形式 | 未確認（JSONL / プレーンテキスト等の可能性） |
-| 更新方法 | 5 分ごとにファイル更新時刻を確認し、当日セッションをカウント |
+| 取得元 | `~/.codex/history.jsonl` |
+| データ形式 | JSONL（`session_id`, `ts`, `text`） |
+| 更新方法 | `ts`（Unix seconds）をローカル日付境界でフィルタし、`session_id` の重複除外で当日セッション数を算出 |
 | 依存 | Python 標準ライブラリのみ |
 | 長所 | 外部依存なし |
-| 短所 | ログの存在・形式が未確認、Codex バージョンで構造が変わる可能性 |
+| 短所 | 公式安定 schema とは限らず、履歴欠損時に過少計上の可能性あり |
 
-**不確実点（高）:**
-- `~/.codex/` に当日セッションを識別できるログが存在するか未確認
-- ファイル名・ディレクトリ構造が未確認
-- トークン情報がログに含まれるかどうか不明
+**検証結果（2026-03-06）:**
+- `~/.codex/` と `~/.codex/history.jsonl` の実在を確認
+- `history.jsonl` 全行で `session_id` / `ts` / `text` を確認
+- 例: 2026-03-06（JST）範囲で `unique_sessions_today=7` を算出できることを確認
+- Codex 側トークン情報は `history.jsonl` には存在せず、「セッション数」用途に限定して利用するのが妥当
 
 #### B-2: Codex 組み込みコマンド（`/status` 代替）
 
@@ -140,6 +147,17 @@
 | 当日レコードが 0 件（実際に使用なし） | `0`（これは正常値） |
 
 「0 件で使用なし」と「取得失敗」は区別して表示する。
+
+Issue #131 で整理したエラー分類:
+
+| ソース | 状態 | 表示 | 備考 |
+|------|------|------|------|
+| ccusage | `command not found` / 実行失敗（非0） | 直接読取へフォールバック（失敗時は `N/A`） | `ccusage` 単独失敗は即 `N/A` 固定にしない |
+| ccusage | JSON parse 失敗 | `N/A (parse error)` | 直接読取へフォールバック可能なら継続 |
+| `~/.claude/projects/` | ディレクトリ不在 / 読み取り不可 | `N/A` | 欠測扱い |
+| `~/.claude/projects/` | JSONL parse 失敗 | `N/A (parse error)` | 行単位スキップ時は正常値と要区別 |
+| `~/.codex/history.jsonl` | ファイル不在 | `N/A` | Codex セッション不明 |
+| `~/.codex/history.jsonl` | parse 失敗（`session_id`/`ts` 抽出不可） | `N/A (parse error)` | ログ存在時の解析失敗 |
 
 ### 表示レイアウト案
 
@@ -222,20 +240,19 @@ def render(claude: dict, codex: dict) -> None:
 
 ---
 
-## 実装に進む場合の追加確認事項
+## Issue #131 検証結果サマリ
 
-1. `ccusage --help` の出力を確認し、`--json` フラグと当日フィルタのフラグ名を特定する
-2. `~/.claude/projects/` 配下の実際のファイル構造とフィールド名を確認する
-3. `~/.codex/` が存在するか、ディレクトリ構造とファイル形式を確認する
-4. キャッシュトークンの扱い方針を決定する（表示に含めるか）
+| ソース | 取得手段 | 必要フィールド | 既知の制約 |
+|---------|----------|----------------|------------|
+| `ccusage` | `ccusage daily --since YYYYMMDD --until YYYYMMDD --json`（または `npx ccusage@latest`） | `daily[].inputTokens`, `daily[].outputTokens`, `daily[].modelBreakdowns[].modelName`, `totals.totalTokens` など | CLI 非導入環境では利用不可。schema 変更リスクあり |
+| `~/.claude/projects/` | `~/.claude/projects/*/*.jsonl` を直接 parse | `timestamp`, `message.model`, `message.usage.input_tokens`, `message.usage.output_tokens`（必要に応じて cache 系） | 非公式ログ形式。`assistant` 以外の行が混在 |
+| `~/.codex/` | `~/.codex/history.jsonl` を直接 parse | `session_id`, `ts` | セッション数集計は可能。トークン情報は取得不可 |
 
 ---
 
-## Blockers
+## 残課題（実装時判断）
 
-| Blocker | 内容 | 影響度 | 対応案 |
+| 項目 | 内容 | 影響度 | 対応案 |
 |---------|------|--------|--------|
-| `ccusage` JSON スキーマ未確認 | `--json` フラグ・出力フィールド名が不明 | 中 | Codex が `ccusage --help` を実行して確認 |
-| `~/.claude/projects/` フォーマット未確認 | JSONL フィールド名・ネスト構造が非公式 | 中 | Codex が実ファイル先頭行を確認 |
-| `~/.codex/` ログ存在未確認 | ディレクトリ自体が存在しない可能性あり | 高 | 存在しない場合は Codex 側を `N/A` 固定で実装開始、後から追加 |
-| キャッシュトークン扱い未決定 | `cache_read_input_tokens` を合算するか方針決定が必要 | 低 | 実装時に Maintainer に確認 |
+| キャッシュトークン扱い | `cache_creation_input_tokens` / `cache_read_input_tokens` を表示 total に含めるか | 低 | 先に表示仕様を決める |
+| `ccusage` 実行経路 | `ccusage` 未導入時に `npx` を使うか、即 direct fallback するか | 低 | 実行時間とネットワーク依存で選択 |
