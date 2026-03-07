@@ -14,10 +14,7 @@
       "env": {
         "TERM_ROLE": "CLAUDE"
       },
-      "args": [
-        "-lc",
-        "cd ~/personal-mcp-core && source .venv/bin/activate && claude"
-      ]
+      "args": ["-lc", ".vscode/bin/claude.sh"]
     },
     "Codex": {
       "path": "bash",
@@ -27,10 +24,7 @@
       "env": {
         "TERM_ROLE": "CODEX"
       },
-      "args": [
-        "-lc",
-        "cd ~/personal-mcp-core && source .venv/bin/activate && codex"
-      ]
+      "args": ["-lc", ".vscode/bin/codex.sh"]
     }
   }
 }
