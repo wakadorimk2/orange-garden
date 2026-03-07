@@ -17,7 +17,7 @@
 				},
 				"args": [
 					"-lc",
-					"cd ~/personal-mcp-core && source .venv/bin/activate && claude"
+					"cd ${workspaceFolder} && source .venv/bin/activate && claude"
 				]
 			},
 			"Codex": {
@@ -30,7 +30,7 @@
 				},
 				"args": [
 					"-lc",
-					"cd ~/personal-mcp-core && source .venv/bin/activate && codex"
+					"cd ${workspaceFolder} && source .venv/bin/activate && codex"
 				]
 			}
 		}
