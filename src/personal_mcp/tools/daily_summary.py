@@ -71,9 +71,7 @@ def get_latest_summary(date: str, data_dir: Optional[str] = None) -> Optional[Di
     return latest
 
 
-def count_events_by_date(
-    days: int = 28, data_dir: Optional[str] = None
-) -> List[Dict[str, Any]]:
+def count_events_by_date(days: int = 28, data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
     """Return [{date, count}] for the last `days` UTC days, including 0-count days."""
     if days <= 0:
         return []
@@ -94,9 +92,7 @@ def count_events_by_date(
     return [{"date": d, "count": buckets[d]} for d in sorted(buckets)]
 
 
-def list_summaries(
-    days: int = 28, data_dir: Optional[str] = None
-) -> List[Dict[str, Any]]:
+def list_summaries(days: int = 28, data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
     """Return latest summary per date for the last `days` days, newest first."""
     if days <= 0:
         return []

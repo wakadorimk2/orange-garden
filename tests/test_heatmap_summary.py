@@ -7,7 +7,11 @@ from typing import Any, Dict, List, Tuple
 
 from personal_mcp.core.event import build_v1_record
 from personal_mcp.storage.sqlite import append_sqlite
-from personal_mcp.tools.daily_summary import count_events_by_date, generate_daily_summary, list_summaries
+from personal_mcp.tools.daily_summary import (
+    count_events_by_date,
+    generate_daily_summary,
+    list_summaries,
+)
 
 
 def _today_utc() -> str:
@@ -168,7 +172,7 @@ def test_http_get_dashboard_200(data_dir: Path) -> None:
     assert statuses == [200]
     assert headers["Content-Type"] == "text/html; charset=utf-8"
     assert "直近28日" in html
-    assert "id=\"heatmap\"" in html
+    assert 'id="heatmap"' in html
 
 
 def test_http_get_heatmap_200(data_dir: Path) -> None:

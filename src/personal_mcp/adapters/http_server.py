@@ -6,7 +6,11 @@ from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse
 
 from personal_mcp.core.event import ALLOWED_DOMAINS
-from personal_mcp.tools.daily_summary import count_events_by_date, get_latest_summary, list_summaries
+from personal_mcp.tools.daily_summary import (
+    count_events_by_date,
+    get_latest_summary,
+    list_summaries,
+)
 from personal_mcp.tools.log_form import ALLOWED_KINDS, event_add_sqlite
 
 # DOMAIN_OPTIONS / KIND_OPTIONS are replaced at render time via str.replace()
