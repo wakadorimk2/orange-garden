@@ -38,16 +38,12 @@ def test_event_add_sqlite_rejects_invalid_kind(data_dir: Path) -> None:
 
 
 def test_event_add_sqlite_accepts_empty_annotation(data_dir: Path) -> None:
-    rec = event_add_sqlite(
-        domain="general", kind="note", annotation="", data_dir=str(data_dir)
-    )
+    rec = event_add_sqlite(domain="general", kind="note", annotation="", data_dir=str(data_dir))
     assert "annotation" not in rec.get("data", {})
 
 
 def test_event_add_sqlite_stores_annotation_in_data(data_dir: Path) -> None:
-    rec = event_add_sqlite(
-        domain="general", kind="note", annotation="メモ", data_dir=str(data_dir)
-    )
+    rec = event_add_sqlite(domain="general", kind="note", annotation="メモ", data_dir=str(data_dir))
     assert rec["data"]["annotation"] == "メモ"
 
 

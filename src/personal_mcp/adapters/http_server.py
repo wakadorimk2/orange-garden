@@ -80,9 +80,7 @@ def _make_html() -> str:
     domain_opts = "\n      ".join(
         f'<option value="{d}">{d}</option>' for d in sorted(ALLOWED_DOMAINS)
     )
-    kind_opts = "\n      ".join(
-        f'<option value="{k}">{k}</option>' for k in sorted(ALLOWED_KINDS)
-    )
+    kind_opts = "\n      ".join(f'<option value="{k}">{k}</option>' for k in sorted(ALLOWED_KINDS))
     return _HTML.replace("DOMAIN_OPTIONS", domain_opts).replace("KIND_OPTIONS", kind_opts)
 
 
