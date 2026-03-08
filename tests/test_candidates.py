@@ -237,6 +237,88 @@ class _FakeTagger:
         return list(self._mapping[text])
 
 
+def _legacy_feature_attr(word: Any, name: str) -> str:
+    feature = getattr(word, "feature", None)
+    value = getattr(feature, name, "")
+    if value in (None, "*"):
+        return ""
+    return str(value)
+
+
+def _legacy_tokenized_candidate(text: str) -> tuple[str, bool]:
+    tagger = candidates_mod._get_tagger()
+    if tagger is None:
+        return "", False
+
+    words = list(tagger(text))
+    chunks: List[str] = []
+    current: List[str] = []
+    sensitive_hit = False
+
+    for idx, word in enumerate(words):
+        surface = str(getattr(word, "surface", "")).strip()
+        if not surface:
+            continue
+
+        pos1 = _legacy_feature_attr(word, "pos1")
+        pos2 = _legacy_feature_attr(word, "pos2")
+        next_surface = ""
+        if idx + 1 < len(words):
+            next_surface = str(getattr(words[idx + 1], "surface", "")).strip()
+
+        if next_surface in candidates_mod._HONORIFICS and pos1 == "名詞":
+            sensitive_hit = True
+            if current:
+                chunks.append("".join(current))
+                current = []
+            continue
+
+        if (
+            pos1 == "名詞"
+            and pos2 in {"普通名詞", "固有名詞"}
+            and surface not in candidates_mod._HONORIFICS
+        ):
+            current.append(surface)
+            continue
+
+        if current:
+            chunks.append("".join(current))
+            current = []
+
+    if current:
+        chunks.append("".join(current))
+
+    for chunk in chunks:
+        candidate = candidates_mod._clean_candidate_text(chunk)
+        if candidates_mod._is_sensitive_label(candidate):
+            sensitive_hit = True
+            continue
+        if candidates_mod._is_meaningful_candidate(candidate):
+            return candidate, sensitive_hit
+
+    if sensitive_hit:
+        return "", True
+    return "", False
+
+
+def _legacy_extract_candidate_text(text: str) -> str:
+    if candidates_mod._ASCII_SLUG.fullmatch(text.strip()):
+        return candidates_mod._clean_candidate_text(text)
+
+    tokenized, sensitive_hit = _legacy_tokenized_candidate(text)
+    if tokenized:
+        return tokenized
+    if sensitive_hit:
+        return ""
+
+    fallback = candidates_mod._clean_candidate_text(candidates_mod._shorten_text(text))
+    if candidates_mod._is_sensitive_label(fallback):
+        return ""
+    if candidates_mod._is_meaningful_candidate(fallback):
+        return fallback
+    return ""
+
+
 def test_extract_candidate_text_prefers_tokenized_noun_chunk(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -327,3 +409,47 @@ def test_list_candidates_filters_sensitive_name_when_tagger_available(
     assert "Codex" in labels
     assert "コードレビュー" in labels
     assert all("沙耶" not in label for label in labels)
+
+
+@pytest.mark.skipif(candidates_mod.Tagger is None, reason="fugashi not installed")
+@pytest.mark.parametrize(
+    ("text", "legacy", "current"),
+    [
+        ("Codexを爆速で消費している", "Codex", "Codex"),
+        ("コードレビューを実施しました", "コードレビュー", "コードレビュー"),
+        ("GitHub issue triageを進めた", "GitHubissu", "GitHub"),
+        ("VS Codeで調査した", "VSCode", "VS Code"),
+        ("山田さんと1on1した", "", "1on1"),
+        ("朝から開発環境を立ち上げ直した", "開発環境", "開発環境"),
+    ],
+)
+def test_extract_candidate_text_real_tagger_comparison_samples(
+    text: str, legacy: str, current: str
+) -> None:
+    assert _legacy_extract_candidate_text(text) == legacy
+    assert _extract_candidate_text(text) == current
+
+
+@pytest.mark.skipif(candidates_mod.Tagger is None, reason="fugashi not installed")
+def test_list_candidates_real_tagger_keeps_natural_candidates(data_dir: Path) -> None:
+    db_path = data_dir / "events.db"
+    texts = [
+        "GitHub issue triageを進めた",
+        "VS Codeで調査した",
+        "山田さんと1on1した",
+        "コードレビューを実施しました",
+        "Codexを爆速で消費している",
+        "朝から開発環境を立ち上げ直した",
+        "休憩",
+    ]
+    for i, text in enumerate(texts):
+        _add_event(db_path, text=text, seq=i)
+
+    got = list_candidates(data_dir=str(data_dir))
+    labels = [item["text"] for item in got]
+
+    assert "GitHub" in labels
+    assert "VS Code" in labels
+    assert "1on1" in labels
+    assert "コードレビュー" in labels
+    assert all("山田" not in label for label in labels)
