@@ -26,6 +26,17 @@ def test_event_add_sqlite_creates_db_file(data_dir: Path) -> None:
     assert (data_dir / "events.db").exists()
 
 
+def test_event_add_sqlite_also_appends_jsonl(data_dir: Path) -> None:
+    rec = event_add_sqlite(domain="general", kind="note", text="hello", data_dir=str(data_dir))
+    path = data_dir / "events.jsonl"
+    assert path.exists()
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(rows) == 1
+    assert rows[0]["domain"] == rec["domain"]
+    assert rows[0]["kind"] == rec["kind"]
+    assert rows[0]["data"]["text"] == rec["data"]["text"]
+
+
 def test_event_add_sqlite_returns_v1_record(data_dir: Path) -> None:
     rec = event_add_sqlite(domain="general", kind="note", text="hello", data_dir=str(data_dir))
     assert rec["v"] == 1
@@ -274,6 +285,14 @@ def test_http_post_events_saves_to_db(data_dir: Path) -> None:
     with sqlite3.connect(str(db_path)) as conn:
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
     assert count == 1
+    jsonl_path = data_dir / "events.jsonl"
+    rows = [
+        json.loads(line) for line in jsonl_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    assert len(rows) == 1
+    assert rows[0]["domain"] == "eng"
+    assert rows[0]["kind"] == "artifact"
+    assert rows[0]["data"]["text"] == "saved"
 
 
 def test_http_post_empty_annotation_not_in_data(data_dir: Path) -> None:

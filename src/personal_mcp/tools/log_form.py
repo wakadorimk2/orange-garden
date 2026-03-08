@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from personal_mcp.core.event import ALLOWED_DOMAINS, build_v1_record
+from personal_mcp.storage.jsonl import append_jsonl
 from personal_mcp.storage.path import resolve_data_dir
 from personal_mcp.storage.sqlite import append_sqlite
 
@@ -83,8 +84,11 @@ def event_add_sqlite(
         source="web-form",
         extra_data=extra or None,
     )
-    db_path = Path(resolve_data_dir(data_dir)) / "events.db"
+    resolved = Path(resolve_data_dir(data_dir))
+    db_path = resolved / "events.db"
+    jsonl_path = resolved / "events.jsonl"
     append_sqlite(db_path, record)
+    append_jsonl(jsonl_path, record)
     return record
 
 
