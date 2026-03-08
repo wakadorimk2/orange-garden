@@ -43,9 +43,7 @@ def test_claude_wrapper_notifies_on_success(tmp_path: Path) -> None:
 
     _make_executable(
         bin_dir / "claude",
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "printf 'claude ok\\n'\n",
+        "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'claude ok\\n'\n",
     )
     _make_executable(
         capture_dir / "capture",
@@ -85,10 +83,7 @@ def test_claude_wrapper_notifies_on_failure_and_preserves_exit_code(tmp_path: Pa
 
     _make_executable(
         bin_dir / "claude",
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "printf 'claude failed\\n' >&2\n"
-        "exit 17\n",
+        "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'claude failed\\n' >&2\nexit 17\n",
     )
     _make_executable(
         capture_dir / "capture",
