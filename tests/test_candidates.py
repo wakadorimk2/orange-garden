@@ -3,15 +3,18 @@ from __future__ import annotations
 import io
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Tuple
 
 import pytest
 
+from personal_mcp.tools import candidates as candidates_mod
 from personal_mcp.core.event import build_v1_record
 from personal_mcp.storage.sqlite import append_sqlite
 from personal_mcp.tools.candidates import (
     FIXED_CANDIDATES,
     MAX_CANDIDATE_LENGTH,
+    _extract_candidate_text,
     _shorten_text,
     list_candidates,
 )
@@ -218,3 +221,109 @@ def test_list_candidates_long_events_produce_short_candidates(data_dir: Path) ->
     assert all(len(item["text"]) <= MAX_CANDIDATE_LENGTH for item in non_fixed), (
         f"all non-fixed candidates must be <= {MAX_CANDIDATE_LENGTH} chars: {non_fixed}"
     )
+
+
+class _FakeWord:
+    def __init__(self, surface: str, pos1: str, pos2: str = "") -> None:
+        self.surface = surface
+        self.feature = SimpleNamespace(pos1=pos1, pos2=pos2, lemma=surface)
+
+
+class _FakeTagger:
+    def __init__(self, mapping: Dict[str, List[_FakeWord]]) -> None:
+        self._mapping = mapping
+
+    def __call__(self, text: str) -> List[_FakeWord]:
+        return list(self._mapping[text])
+
+
+def test_extract_candidate_text_prefers_tokenized_noun_chunk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping = {
+        "Codexを爆速で消費している": [
+            _FakeWord("Codex", "名詞", "普通名詞"),
+            _FakeWord("を", "助詞", "格助詞"),
+            _FakeWord("爆", "記号", "一般"),
+            _FakeWord("速", "名詞", "普通名詞"),
+            _FakeWord("で", "助詞", "格助詞"),
+            _FakeWord("消費", "名詞", "普通名詞"),
+        ],
+        "コードレビューを実施しました": [
+            _FakeWord("コード", "名詞", "普通名詞"),
+            _FakeWord("レビュー", "名詞", "普通名詞"),
+            _FakeWord("を", "助詞", "格助詞"),
+            _FakeWord("実施", "名詞", "普通名詞"),
+        ],
+    }
+    monkeypatch.setattr(candidates_mod, "_get_tagger", lambda: _FakeTagger(mapping))
+
+    assert _extract_candidate_text("Codexを爆速で消費している") == "Codex"
+    assert _extract_candidate_text("コードレビューを実施しました") == "コードレビュー"
+
+
+def test_extract_candidate_text_skips_name_with_honorific(monkeypatch: pytest.MonkeyPatch) -> None:
+    mapping = {
+        "久しぶりに沙耶ちゃんに会う": [
+            _FakeWord("久し", "形容詞", "一般"),
+            _FakeWord("沙耶", "名詞", "固有名詞"),
+            _FakeWord("ちゃん", "接尾辞", "名詞的"),
+            _FakeWord("会う", "動詞", "一般"),
+        ]
+    }
+    monkeypatch.setattr(candidates_mod, "_get_tagger", lambda: _FakeTagger(mapping))
+
+    assert _extract_candidate_text("久しぶりに沙耶ちゃんに会う") == ""
+
+
+def test_extract_candidate_text_fallback_skips_sensitive_label(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(candidates_mod, "_get_tagger", lambda: None)
+
+    assert _extract_candidate_text("沙耶ちゃん") == ""
+
+
+def test_list_candidates_filters_sensitive_name_when_tagger_available(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mapping = {
+        "久しぶりに沙耶ちゃんに会う": [
+            _FakeWord("久し", "形容詞", "一般"),
+            _FakeWord("沙耶", "名詞", "固有名詞"),
+            _FakeWord("ちゃん", "接尾辞", "名詞的"),
+            _FakeWord("会う", "動詞", "一般"),
+        ],
+        "Codexを爆速で消費している": [
+            _FakeWord("Codex", "名詞", "普通名詞"),
+            _FakeWord("を", "助詞", "格助詞"),
+            _FakeWord("消費", "名詞", "普通名詞"),
+        ],
+        "コードレビューを実施しました": [
+            _FakeWord("コード", "名詞", "普通名詞"),
+            _FakeWord("レビュー", "名詞", "普通名詞"),
+            _FakeWord("を", "助詞", "格助詞"),
+            _FakeWord("実施", "名詞", "普通名詞"),
+        ],
+    }
+    monkeypatch.setattr(candidates_mod, "_get_tagger", lambda: _FakeTagger(mapping))
+
+    db_path = data_dir / "events.db"
+    texts = [
+        "久しぶりに沙耶ちゃんに会う",
+        "Codexを爆速で消費している",
+        "コードレビューを実施しました",
+        "移動",
+        "休憩",
+        "振り返り",
+        "テストを書いていた",
+    ]
+    for i, text in enumerate(texts):
+        _add_event(db_path, text=text, seq=i)
+
+    got = list_candidates(data_dir=str(data_dir))
+    labels = [item["text"] for item in got]
+
+    assert "Codex" in labels
+    assert "コードレビュー" in labels
+    assert all("沙耶" not in label for label in labels)
