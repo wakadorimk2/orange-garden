@@ -18,6 +18,10 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+def _today_local() -> str:
+    return datetime.now().astimezone().strftime("%Y-%m-%d")
+
+
 def _date_days_ago(days: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
@@ -96,7 +100,7 @@ def test_count_events_by_date_counts_today_events(data_dir: Path) -> None:
     _add_event(db_path, domain="mood")
     _add_event(db_path, domain="eng")
     result = count_events_by_date(28, data_dir=str(data_dir))
-    today_entry = next(r for r in result if r["date"] == _today_utc())
+    today_entry = next(r for r in result if r["date"] == _today_local())
     assert today_entry["count"] == 2
 
 
@@ -104,7 +108,7 @@ def test_count_events_by_date_excludes_summary_domain(data_dir: Path) -> None:
     db_path = data_dir / "events.db"
     _append_summary(db_path, _today_utc())
     result = count_events_by_date(28, data_dir=str(data_dir))
-    today_entry = next(r for r in result if r["date"] == _today_utc())
+    today_entry = next(r for r in result if r["date"] == _today_local())
     assert today_entry["count"] == 0
 
 
