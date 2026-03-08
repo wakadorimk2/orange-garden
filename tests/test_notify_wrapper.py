@@ -55,7 +55,7 @@ def test_notify_dispatches_to_custom_adapter_directory(tmp_path: Path) -> None:
     adapter.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "stdin_payload=\"$(cat)\"\n"
+        'stdin_payload="$(cat)"\n'
         "printf 'channel=%s\\n' \"$NOTIFY_CHANNEL_NAME\"\n"
         "printf 'event=%s\\n' \"$NOTIFY_EVENT\"\n"
         "printf 'title=%s\\n' \"$NOTIFY_TITLE\"\n"
