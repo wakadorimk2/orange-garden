@@ -109,9 +109,7 @@ def _validate_context(
     if not branch:
         errors.append("branch mismatch: detached HEAD is not allowed")
     elif not re.fullmatch(expect_branch_pattern, branch):
-        errors.append(
-            f"branch mismatch: expected /{expect_branch_pattern}/, got {branch}"
-        )
+        errors.append(f"branch mismatch: expected /{expect_branch_pattern}/, got {branch}")
 
     return errors
 
