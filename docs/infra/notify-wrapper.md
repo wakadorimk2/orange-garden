@@ -347,9 +347,10 @@ yet, export `NOTIFY_CHANNEL=discord` and `DISCORD_WEBHOOK_URL` in the same
 shell, then rerun the command above. A successful Discord webhook send produces
 no stdout output and exits with code `0`.
 
-Real Discord smoke-test evidence is tracked separately in issue #268 so this
-documented setup can stay reproducible without requiring a live webhook during
-issue #267.
+Real Discord smoke-test evidence is now recorded in
+[`docs/infra/ai-cli-discord-smoke-log.md`](./ai-cli-discord-smoke-log.md), so
+this documented setup can stay reproducible without requiring a live webhook
+during issue #267.
 
 ## Current event coverage and remaining gaps
 
@@ -388,9 +389,10 @@ Current behavior behind that table:
 ### Scope boundary for closing #255
 
 Issue #255 can close once the currently shipped Codex and Claude completion
-paths are operationalized and the real Discord smoke-test evidence is recorded.
-The gaps above should stay explicit follow-up work, not implied requirements
-for closing the Epic:
+paths are operationalized and the real Discord smoke-test evidence in
+[`docs/infra/ai-cli-discord-smoke-log.md`](./ai-cli-discord-smoke-log.md) is
+recorded. The gaps above should stay explicit follow-up work, not implied
+requirements for closing the Epic:
 
 - `needs_input` remains out of scope for #255
 - Codex-side failure notifications remain out of scope for #255
