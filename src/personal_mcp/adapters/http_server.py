@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from personal_mcp.core.event import ALLOWED_DOMAINS
-from personal_mcp.tools.candidates import list_candidates
+from personal_mcp.tools.candidates import FIXED_CANDIDATES, list_candidates
 from personal_mcp.tools.daily_summary import (
     count_events_by_date,
     get_latest_summary,
@@ -347,7 +347,7 @@ renderSuggestion();
 </body>
 </html>"""
 
-_DASHBOARD_HTML = """\
+_DASHBOARD_HTML_TEMPLATE = """\
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -472,7 +472,7 @@ h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 </div>
 <div id="summaries"></div>
 <script>
-var DASHBOARD_FALLBACK_CANDIDATES = ["作業開始", "休憩", "移動", "食事", "作業完了"];
+var DASHBOARD_FALLBACK_CANDIDATES = DASHBOARD_FALLBACK_CANDIDATES_JSON;
 var candidateTapMode = "compose";
 var dashboardBusy = false;
 var dashboardInputFlow = null;
@@ -495,7 +495,7 @@ function startDashboardInputFlow(options) {
     flowId: newDashboardFlowId(),
     mode: mode,
     trigger: (next.trigger || "").trim(),
-    candidateSource: (next.candidate_source || "").trim(),
+    candidateSource: resolveDashboardCandidateSource(mode, next.candidate_source || ""),
     initialText: text,
     editedBeforeSubmit: false
   };
@@ -514,11 +514,23 @@ function ensureDashboardInputFlow(options) {
   return startDashboardInputFlow(options);
 }
 
+function resolveDashboardCandidateSource(mode, candidateSource) {
+  var normalized = (candidateSource || "").trim();
+  if (normalized) return normalized;
+  if (mode === "text") return "free_text";
+  return "";
+}
+
 function buildDashboardFlowPayload(text, extraUiData) {
+  var mode = extraUiData && extraUiData.mode ? extraUiData.mode : "text";
+  var candidateSource = resolveDashboardCandidateSource(
+    mode,
+    extraUiData && extraUiData.candidate_source ? extraUiData.candidate_source : ""
+  );
   var flow = ensureDashboardInputFlow({
-    mode: extraUiData && extraUiData.mode ? extraUiData.mode : "text",
+    mode: mode,
     trigger: extraUiData && extraUiData.trigger ? extraUiData.trigger : "dashboard_submit",
-    candidate_source: extraUiData && extraUiData.candidate_source ? extraUiData.candidate_source : "",
+    candidate_source: candidateSource,
     text: text
   });
   var payload = Object.assign({}, extraUiData || {});
@@ -527,9 +539,9 @@ function buildDashboardFlowPayload(text, extraUiData) {
   payload.trigger = flow && flow.trigger ? flow.trigger : (payload.trigger || "dashboard_submit");
   payload.edited_before_submit = flow ? flow.editedBeforeSubmit : !!payload.edited_before_submit;
   payload.text_length = text.length;
-  if (flow && flow.candidateSource && !payload.candidate_source) {
-    payload.candidate_source = flow.candidateSource;
-  }
+  payload.candidate_source = flow
+    ? resolveDashboardCandidateSource(payload.mode, flow.candidateSource)
+    : candidateSource;
   return payload;
 }
 
@@ -849,6 +861,11 @@ loadSummaries();
 </script>
 </body>
 </html>"""  # noqa: E501
+
+_DASHBOARD_HTML = _DASHBOARD_HTML_TEMPLATE.replace(
+    "DASHBOARD_FALLBACK_CANDIDATES_JSON",
+    json.dumps(list(FIXED_CANDIDATES), ensure_ascii=False),
+)
 
 
 def _make_html() -> str:
