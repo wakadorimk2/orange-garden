@@ -4,6 +4,9 @@
 > この文書は Issue #204 の実装 spec である。
 > `eng` domain の概念設計は [#193] に委ねる（本文書では扱わない）。
 > 外部保存戦略は [#150]、storage 単一化実装は [#189/#190/#191] で管理する。
+> #204 の完了条件は **spec / acceptance contract / boundary definition の固定** であり、
+> runtime の ingest 実装完了は含まない。本体実装は follow-up Issue で行う。
+> したがって、#204 は docs がレビュー可能になり follow-up 実装へ引き渡せる状態で close してよい。
 >
 > **この文書が定めるもの:**
 > - 既存 `github_sync` MVP の責務と境界
@@ -44,6 +47,16 @@
 - `eng` domain の event 化 `kind` 方針の明文化（Section 4）
 - storage 依存を段階化した完了条件の設定（Section 5 / 6）
 
+**#204 を close してよい条件:**
+- Section 2 から Section 5 の spec がレビュー可能な状態で固定されている
+- 関連参照から本文書を辿れる
+- follow-up 実装 Issue が、責務境界を再議論せず本文書を参照して着手できる
+
+**#204 でやらないこと:**
+- 新 ingest runtime 実装の追加
+- 既存 `github_sync` の削除や置換
+- #193 / #150 / #189 / #190 / #191 の責務の意味変更
+
 ---
 
 ## 2. 取り込み対象の最小セット
@@ -52,16 +65,32 @@
 
 | 優先 | GitHub event type | event 化 判断 | `kind` | `ref` 形式 |
 |---|---|---|---|---|
-| HIGH | `IssuesEvent` (closed) | Issue のクローズ → 節目 | `milestone` | `#<number>` |
-| HIGH | `PullRequestEvent` (closed + merged) | PR マージ → 節目 | `milestone` | `PR#<number>` |
-| HIGH | `PushEvent` | commit push → 成果物 | `artifact` | short SHA (7 文字以上) |
-| MED | `IssuesEvent` (opened / other) | Issue の開始・更新 | `note` | `#<number>` |
-| MED | `PullRequestEvent` (closed, not merged) | PR クローズ → 節目 | `milestone` | `PR#<number>` |
-| MED | `PullRequestEvent` (opened / other) | PR の開始・更新 | `artifact` | `PR#<number>` |
-| MED | `CreateEvent` | branch / tag 作成 | `artifact` | ─（`data.text` で表現） |
-| LOW | その他の recognized type | 補足記録 | `note` | ─ |
+| HIGH | `IssuesEvent` (`action=closed`) | Issue のクローズ → 節目 | `milestone` | `#<number>` |
+| HIGH | `PullRequestEvent` (`action=closed`, `merged=true`) | PR マージ → 節目 | `milestone` | `PR#<number>` |
+| HIGH | `PushEvent` | commit push → 成果物 | `artifact` | head commit の short SHA（7 文字以上） |
+| MED | `IssuesEvent` (`action=opened` / `reopened` / `edited`) | Issue の開始・再開・更新 | `note` | `#<number>` |
+| MED | `PullRequestEvent` (`action=closed`, `merged=false`) | PR クローズ → 節目 | `milestone` | `PR#<number>` |
+| MED | `PullRequestEvent` (`action=opened` / `reopened` / `edited` / `synchronize`) | PR の開始・再開・更新 | `artifact` | `PR#<number>` |
+| MED | `CreateEvent` (`ref_type=branch` / `tag`) | branch / tag 作成 | `artifact` | ─（`data.*` で表現） |
+| LOW | その他の event type（fallback 条件を満たすもの） | 補足記録 | `note` | ─ |
 
-### 2.2 除外対象（skip list）
+補足:
+
+- ここで列挙する action は「新 ingest 実装で最小限サポートする粒度」であり、GitHub payload の全 action を列挙することは目的としない
+- `PushEvent` が複数 commit を含む場合でも、`ref` は head commit の short SHA を主参照として 1 つだけ入れる
+- `action` が上表に含まれない場合は、自動で取り込まず Section 2.2 / 2.3 の条件で扱う
+
+### 2.2 fallback 取り込み条件
+
+`LOW` の fallback は「recognized type なら何でも入れる」ための入口ではない。以下をすべて満たす場合のみ `note` として取り込む。
+
+- `data.repo_full_name` を安定して保持できる
+- `data.github_event_type` を保持できる
+- `data.text` に人間が読める要約を安定生成できる
+
+上記のいずれかを満たせない場合は fallback で取り込まず skip とする。
+
+### 2.3 除外対象（skip list）
 
 以下は low-signal として取り込まない:
 
@@ -73,7 +102,7 @@
 
 追加除外が必要になった場合は skip list を更新し、本文書に理由を記録する。
 
-### 2.3 取り込み対象外（スコープ外）
+### 2.4 取り込み対象外（スコープ外）
 
 - Organization events（`/orgs/{org}/events`）: 個人の activity log の対象外
 - GitHub Actions / Deployments events: 対象の別 Issue での判断を待つ
@@ -99,6 +128,9 @@
 
 ### 3.2 `ref` 値の形式
 
+`ref` は「短い人間向け参照」を置く欄であり、repo 文脈・event type・action・GitHub 上の URL は `data.*` に保持する。
+`ref` に URL や複数の文脈情報を詰め込まない。
+
 | 対象 | `ref` 形式 | 例 |
 |---|---|---|
 | GitHub Issue | `"#<number>"` | `"#148"` |
@@ -108,9 +140,44 @@
 
 複数参照が発生する場合はスペース区切り（先頭が主参照）で表現する。
 
-### 3.3 dedup キー
+補足ルール:
+
+- `PushEvent` の `ref` は head commit の short SHA を主参照とする
+- `PushEvent` が複数 commit を含む場合、commit 数や full SHA などの補足情報は `data.text` または `data.*` に保持する
+- `CreateEvent` は `ref` を省略したまま、branch / tag の別と ref 名を `data.ref_type` / `data.ref_name` で保持する
+- これらは新 ingest 実装の受け入れ条件であり、#204 自体は既存 `github_sync` の runtime 挙動変更を要求しない
+
+### 3.3 downstream 利用のための `data.*` 最低限フィールド
+
+Event Contract v1 の `data` は可変 payload とするが、新 ingest 実装では downstream 利用のため最低限以下の情報を保持する。
+
+| key | 方針 |
+|---|---|
+| `data.github_event_id` | `source: "github"` / `"github-import"` の dedup 用。原則必須 |
+| `data.github_event_type` | GitHub event type の記録。原則必須 |
+| `data.repo_full_name` | `owner/repo` の repo 文脈。対象 scope 内では原則保持 |
+| `data.action` | payload に action がある event で保持。取得不能なら省略可 |
+| `data.html_url` | GitHub 上で人間が開ける stable URL が取れる場合に保持。`ref` には入れない |
+| `data.head_sha` | `PushEvent` の full SHA。`ref` の主参照 short SHA を補足する |
+| `data.commit_count` | `PushEvent` の commit 数。複数 commit の補足用 |
+| `data.ref_type` | `CreateEvent` の branch / tag 区別 |
+| `data.ref_name` | `CreateEvent` の ref 名 |
+
+補足:
+
+- この節は Event Contract v1 の schema 意味変更ではなく、#204 の新 ingest 実装における「最低限保持したい payload」の定義である
+- `data.html_url` は stable な人間向け URL を優先し、安定 URL を構成できない event type では省略可とする
+
+### 3.4 dedup キーと update policy
 
 逐次同期（`source: "github"`）の重複判定は `data.github_event_id` を使用する。
+同一 `data.github_event_id` を持つ既存 record がある場合は **skip** し、既存 event の上書き更新は行わない。
+
+原則:
+
+- 逐次同期は insert-only / skip とする
+- 同一 event の再取得を理由に、既存 record の `text` / `data.*` / `tags` / `ref` を親切心で更新しない
+- 後から情報補完が必要になった場合でも、逐次同期の update としては扱わず別 Issue / 別経路で判断する
 
 一括 import（`source: "github-import"`）の重複判定キーは、`source` の違いにより逐次同期と独立して管理できる。最終仕様は Layer 2 の完了条件として定義する（Section 6 参照）。
 
@@ -128,16 +195,16 @@
 - GitHub event type を `kind` の名前にしない（例: `push_event` は使わない）
 - イベントが「何であるか」の抽象的型として v1 minimum kind set から選ぶ
 
-### 4.2 マッピング方針（既存実装との整合）
+### 4.2 マッピング方針（既存実装を踏まえた新 ingest の受け入れ条件）
 
-現在の `github_sync` 実装のマッピングは以下の通りで、kind taxonomy v1 の設計意図と整合している:
+既存 `github_sync` の baseline を踏まえつつ、新 ingest 実装では以下を `kind` マッピングの受け入れ条件とする:
 
 | GitHub event | `kind` | 意図 |
 |---|---|---|
-| Issue クローズ / PR close | `milestone` | 節目・到達点 |
-| Push / PR open / Create | `artifact` | 成果物の作成・更新 |
-| Issue open 等 | `note` | 気づき・開始の記録 |
-| その他認識外イベント | `note` | fallback |
+| `IssuesEvent` (`closed`) / `PullRequestEvent` (`closed`) | `milestone` | 節目・到達点 |
+| `PushEvent` / `PullRequestEvent` (`opened` / `reopened` / `edited` / `synchronize`) / `CreateEvent` | `artifact` | 成果物の作成・更新 |
+| `IssuesEvent` (`opened` / `reopened` / `edited`) | `note` | 気づき・開始の記録 |
+| その他の event type | `note` or skip | fallback 条件を満たす場合のみ `note`、満たさなければ skip |
 
 `kind` の追加が必要になった場合は `docs/kind-taxonomy-v1.md` の Kind Add Rules に従う。
 
@@ -151,10 +218,14 @@
 - [ ] 既存 `github_sync` の責務（手動同期 MVP）と本 Issue の責務（新 ingest 実装）の境界が明文化されている（→ Section 1）
 - [ ] `eng` domain で event 化する最小単位と `kind` 方針が定義されている（→ Section 4）
 - [ ] `source/ref` 契約の適用ルールが明文化されている（→ Section 3）
+- [ ] downstream 利用に必要な最低限の `data.*` が定義されている（→ Section 3.3）
+- [ ] dedup の insert-only / skip 方針が明文化されている（→ Section 3.4）
 - [ ] Layer 1 の完了条件が本文書として記録されており、レビュー可能な状態である
+- [ ] 関連参照から本文書を辿れる状態になっている
+- [ ] follow-up 実装 Issue が本文書を参照して着手できる状態である
 
-> **現状:** 本文書の作成により Layer 1 の doc 要件を満たす。
-> 本体実装（新 ingest 実装）は別 follow-up Issue で行う。
+> **Issue close 判断:** #204 は Layer 1 の各項目が満たされ、本文書が review 済みで follow-up 実装へ引き渡せる時点で close してよい。
+> runtime の ingest 実装完了は #204 の完了条件に含めない。
 
 ---
 
@@ -194,7 +265,7 @@
 
 | 後続作業 | 参照 |
 |---|---|
-| 新 ingest 本体実装 | 本文書 Section 2–4 を仕様として参照する follow-up Issue |
+| 新 ingest 本体実装 | 本文書 Section 2–5 を仕様として参照する follow-up Issue |
 | storage 単一化との整合確認 | `docs/storage-unification-plan.md`、#190/#191 |
 | `source/ref` 契約の詳細 | `docs/mvp-contract-decisions.md` Section D |
 | `kind` 追加ルール | `docs/kind-taxonomy-v1.md` Kind Add Rules |
