@@ -277,6 +277,7 @@ def test_http_get_dashboard_candidate_tap_script_exists(data_dir: Path) -> None:
     assert "renderComposerState();" in html
     assert 'await fetch("/api/candidates")' in html
 
+
 def test_http_get_dashboard_ignores_broken_pipe_from_client_disconnect(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     handler = _new_handler(handler_cls, "/dashboard")
