@@ -21,14 +21,10 @@ from __future__ import annotations
 
 import json
 import urllib.request
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from personal_mcp.core.event import build_v1_record
-from personal_mcp.storage.events_store import append_event
-from personal_mcp.storage.jsonl import read_jsonl
-from personal_mcp.storage.path import resolve_data_dir
-from personal_mcp.storage.sqlite import read_sqlite
+from personal_mcp.storage.events_store import append_event, read_events
 
 
 _SKIP_TYPES: frozenset = frozenset({"WatchEvent", "PublicEvent", "MemberEvent"})
@@ -161,22 +157,13 @@ def _map_github_event(gh_event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def _load_existing_github_event_ids(data_dir: Optional[str]) -> Set[str]:
-    """Return github_event_id values already stored across current storages.
-
-    During dual-write migration, older github records may exist only in
-    events.jsonl even when events.db is non-empty. Read both backends and
-    union ids so insert-only / skip remains stable across mixed storage.
-    """
-    resolved = Path(resolve_data_dir(data_dir))
-    db_path = resolved / "events.db"
-    jsonl_path = resolved / "events.jsonl"
+    """Return github_event_id values already stored in runtime storage (events.db)."""
     ids: Set[str] = set()
-    for rows in (read_sqlite(db_path), read_jsonl(jsonl_path)):
-        for r in rows:
-            if r.get("source") == "github":
-                eid = r.get("data", {}).get("github_event_id")
-                if eid:
-                    ids.add(str(eid))
+    for r in read_events(data_dir):
+        if r.get("source") == "github":
+            eid = r.get("data", {}).get("github_event_id")
+            if eid:
+                ids.add(str(eid))
     return ids
 
 
