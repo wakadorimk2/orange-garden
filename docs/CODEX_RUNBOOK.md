@@ -80,6 +80,34 @@ git branch --show-current
 
 停止条件: remote 誤り、不要差分あり、`main` 上での作業。
 
+`git pull` / `git merge` / `git rebase` を実行するときは、誤 worktree 混入を避けるため
+`scripts/codex_git_guard.py` を前段に置く。
+
+コマンド例:
+
+```bash
+python scripts/codex_git_guard.py \
+  --expect-role ops \
+  --expect-worktree /home/you/projects/pmc-ops \
+  --expect-branch main \
+  --expect-remote origin \
+  -- pull
+```
+
+失敗時:
+
+- 標準エラーに `role/worktree/current branch/target branch/remote/clean tree` のどこが不一致か出る
+- `recovery:` に従って正しい worktree / branch へ戻ってから再実行する
+
+bypass が必要な場合:
+
+```bash
+PMC_GIT_GUARD_BYPASS=1 python scripts/codex_git_guard.py -- pull origin main
+```
+
+- bypass は one-off のみとし、理由を PR または作業メモに残す
+- 常用 alias や環境変数 export での恒久 bypass はしない
+
 ### 2. Review
 
 目的: 変更意図、リスク、確認対象を短く把握する。
@@ -102,14 +130,19 @@ git diff
 
 目的: lint / import / format 系の失敗を先に潰す。
 
+Ruff 設定の正本は `pyproject.toml` とする。
+`ruff check .` は lint rule failure を示し、`E501` を ignore していない限り line-length violation を含みうる。
+`ruff format --check .` は formatting drift を示し、line-length 設定の CLI 上書き有無とは別に読む。
+
 コマンド例:
 
 ```bash
 ruff --version
 ruff check .
+ruff format --check .
 ```
 
-期待結果: `ruff check .` が成功する。失敗時は対象ファイルとルールが特定できる。
+期待結果: `ruff check .` と `ruff format --check .` が成功する。失敗時は対象ファイルと rule / formatting drift が特定できる。
 
 次に進む条件: 成功、または最小修正で収まりそうと判断できる。
 

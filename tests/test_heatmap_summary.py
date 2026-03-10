@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import io
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from personal_mcp.core.event import build_v1_record
 from personal_mcp.storage.sqlite import append_sqlite
+from personal_mcp.tools.candidates import FIXED_CANDIDATES
 from personal_mcp.tools.daily_summary import (
     count_events_by_date,
     generate_daily_summary,
@@ -264,7 +266,32 @@ def test_http_get_dashboard_candidate_tap_script_exists(data_dir: Path) -> None:
     assert "tag.dataset.source = source;" in html
     assert "input.value = text;" in html
     assert "renderComposerState();" in html
+    assert "var dashboardInputFlow = null;" in html
+    assert (
+        'candidateSource: resolveDashboardCandidateSource(mode, next.candidate_source || ""),'
+        in html
+    )
+    assert "flow_id: dashboardInputFlow.flowId" in html
+    assert 'postUiEvent("input_started"' in html
+    assert 'await postUiEvent("input_submitted", telemetryData);' in html
+    assert 'await postUiEvent("save_success", telemetryData);' in html
+    assert "function resolveDashboardCandidateSource(mode, candidateSource) {" in html
+    assert 'if (mode === "text") return "free_text";' in html
+    assert "payload.candidate_source = flow" in html
+    assert 'mode: "tag"' in html
+    assert 'mode: "quick"' in html
+    assert 'trigger: "candidate_tag"' in html
+    assert 'trigger: "dashboard_submit"' in html
+    assert "flow.editedBeforeSubmit = true;" in html
+    assert "resetDashboardInputFlow();" in html
     assert 'await fetch("/api/candidates")' in html
+
+
+def test_http_get_dashboard_fallback_candidates_match_fixed_candidates(data_dir: Path) -> None:
+    handler_cls = _make_handler_for_test(str(data_dir))
+    _, _, html = _do_get_html(handler_cls, "/dashboard")
+    expected = json.dumps(list(FIXED_CANDIDATES), ensure_ascii=False)
+    assert f"var DASHBOARD_FALLBACK_CANDIDATES = {expected};" in html
 
 
 def test_http_get_dashboard_has_sticky_composer_and_enter_submit(data_dir: Path) -> None:
