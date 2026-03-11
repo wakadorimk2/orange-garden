@@ -2,8 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Reuse the same Discord payload and POST path as the prod adapter.
 source "$SCRIPT_DIR/_discord_webhook.sh"
 
 send_discord_webhook_notification \
-  "DISCORD_WEBHOOK_URL" \
-  "$HOME/.config/secrets/discord_webhook.env"
+  "DISCORD_TEST_WEBHOOK_URL" \
+  "$HOME/.config/secrets/discord_test_webhook.env"
