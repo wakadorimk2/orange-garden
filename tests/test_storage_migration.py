@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ import pytest
 from personal_mcp.server import main
 from personal_mcp.storage.events_store import rebuild_db_from_jsonl, rebuild_jsonl_from_db
 from personal_mcp.storage.sqlite import append_sqlite, read_sqlite
+from personal_mcp.tools.event import event_list
 
 
 def _db_count(db_path: Path) -> int:
@@ -23,31 +25,23 @@ def _write_events(path: Path, events: list[dict]) -> None:
     )
 
 
-def _insert_pre307_row(db_path: Path, record: dict) -> None:
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.executescript(
-            """
-            CREATE TABLE events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ts TEXT NOT NULL,
-                domain TEXT NOT NULL,
-                kind TEXT,
-                raw TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts);
-            CREATE INDEX IF NOT EXISTS idx_events_domain ON events (domain);
-            """
-        )
-        conn.execute(
-            "INSERT INTO events (ts, domain, kind, raw) VALUES (?, ?, ?, ?)",
-            (
-                record["ts"],
-                record["domain"],
-                record["kind"],
-                json.dumps(record, ensure_ascii=False),
-            ),
-        )
-        conn.commit()
+def _today_local_noon() -> str:
+    return (
+        datetime.now().astimezone().replace(hour=12, minute=0, second=0, microsecond=0).isoformat()
+    )
+
+
+def _github_push_event(event_id: str = "100") -> dict:
+    return {
+        "id": event_id,
+        "type": "PushEvent",
+        "repo": {"name": "user/repo"},
+        "created_at": "2026-03-07T10:00:00Z",
+        "payload": {
+            "ref": "refs/heads/main",
+            "commits": [{"sha": "abc1234567890"}],
+        },
+    }
 
 
 def test_rebuild_jsonl_from_db_dry_run_and_apply(data_dir: Path) -> None:
@@ -150,74 +144,176 @@ def test_rebuild_db_from_jsonl_dry_run_and_apply_with_legacy_normalization(data_
     assert rows[1]["data"]["text"] == "v1 entry"
 
 
-def test_append_sqlite_backfills_pre307_github_dedup_key(data_dir: Path) -> None:
-    db_path = data_dir / "events.db"
-    existing = {
-        "v": 1,
-        "ts": "2026-03-07T10:00:00+00:00",
-        "domain": "eng",
-        "kind": "artifact",
-        "data": {"text": "already saved", "github_event_id": "100"},
-        "tags": [],
-        "source": "github",
-    }
-    _insert_pre307_row(db_path, existing)
+def test_event_list_reads_legacy_record_imported_via_recovery_migration(data_dir: Path) -> None:
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "ts": "2026-03-03T12:00:00+00:00",
+                "domain": "general",
+                "payload": {"text": "legacy"},
+                "tags": [],
+            }
+        ],
+    )
 
-    outcome = append_sqlite(db_path, existing)
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
 
-    assert outcome == "skipped"
-    assert len(read_sqlite(db_path)) == 1
-    with sqlite3.connect(str(db_path)) as conn:
-        rows = conn.execute("SELECT id, dedup_key FROM events ORDER BY id ASC").fetchall()
-    assert rows == [(1, "github:100")]
+    result = event_list(data_dir=str(data_dir))
+
+    assert len(result) == 1
+    assert result[0]["data"]["text"] == "legacy"
+    assert "v" not in result[0]
 
 
-def test_append_sqlite_raises_on_invalid_write_not_duplicate(data_dir: Path) -> None:
-    db_path = data_dir / "events.db"
+def test_event_list_keeps_kind_missing_when_importing_legacy_record(data_dir: Path) -> None:
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "ts": "2026-03-03T12:00:00+00:00",
+                "domain": "poe2",
+                "payload": {"text": "no-kind"},
+                "tags": [],
+            }
+        ],
+    )
 
-    with pytest.raises(sqlite3.IntegrityError):
-        append_sqlite(
-            db_path,
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+
+    result = event_list(data_dir=str(data_dir))
+
+    assert len(result) == 1
+    assert result[0]["data"]["text"] == "no-kind"
+    assert "kind" not in result[0]
+
+
+def test_event_today_reads_legacy_record_imported_via_recovery_migration(
+    data_dir: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "ts": _today_local_noon(),
+                "domain": "poe2",
+                "payload": {"text": "legacy today"},
+                "tags": [],
+            }
+        ],
+    )
+
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+
+    main(["event-today", "--data-dir", str(data_dir)])
+
+    captured = capsys.readouterr()
+    assert "[poe2] legacy today" in captured.out
+    assert "[?]" not in captured.out
+
+
+def test_poe2_log_list_kind_filter_excludes_kind_missing_after_recovery_migration(
+    data_dir: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "ts": "2026-03-04T10:00:00Z",
+                "domain": "poe2",
+                "payload": {"text": "legacy no-kind"},
+                "tags": [],
+            }
+        ],
+    )
+
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+
+    main(["poe2-log-list", "--kind", "note", "--json", "--data-dir", str(data_dir)])
+
+    captured = capsys.readouterr()
+    rows = json.loads(captured.out)
+    assert rows == []
+
+
+def test_poe2_log_list_text_shows_question_mark_after_recovery_migration(
+    data_dir: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "ts": "2026-03-04T10:00:00Z",
+                "domain": "poe2",
+                "payload": {"text": "legacy no-kind"},
+                "tags": [],
+            }
+        ],
+    )
+
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+
+    main(["poe2-log-list", "--data-dir", str(data_dir)])
+
+    captured = capsys.readouterr()
+    assert "[?]" in captured.out
+    assert "legacy no-kind" in captured.out
+
+
+def test_github_sync_skips_duplicate_after_recovery_migration(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import personal_mcp.tools.github_sync as mod
+
+    _write_events(
+        data_dir / "events.jsonl",
+        [
             {
                 "v": 1,
-                "kind": "note",
-                "data": {"text": "missing required fields"},
+                "ts": "2026-03-07T10:00:00+00:00",
+                "domain": "eng",
+                "kind": "artifact",
+                "data": {"text": "already saved", "github_event_id": "100"},
                 "tags": [],
-            },
-        )
+                "source": "github",
+            }
+        ],
+    )
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+    monkeypatch.setattr(mod, "_fetch_github_events", lambda u, t: [_github_push_event("100")])
 
-    assert read_sqlite(db_path) == []
+    result = mod.github_sync(username="user", data_dir=str(data_dir))
+
+    assert result == {"saved": 0, "skipped": 1, "failed": 0}
+    assert len(read_sqlite(data_dir / "events.db")) == 1
 
 
-def test_rebuild_db_from_jsonl_reports_actual_written_count_after_dedup(
-    data_dir: Path,
+def test_github_ingest_skips_duplicate_after_recovery_migration(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    duplicate = {
-        "v": 1,
-        "ts": "2026-03-07T10:00:00+00:00",
-        "domain": "eng",
-        "kind": "artifact",
-        "data": {"text": "duplicate", "github_event_id": "100"},
-        "tags": [],
-        "source": "github",
-    }
-    manual = {
-        "v": 1,
-        "ts": "2026-03-07T11:00:00+00:00",
-        "domain": "general",
-        "kind": "note",
-        "data": {"text": "manual"},
-        "tags": [],
-        "source": "manual",
-    }
-    _write_events(data_dir / "events.jsonl", [duplicate, duplicate, manual])
+    import personal_mcp.tools.github_ingest as mod
 
-    applied = rebuild_db_from_jsonl(data_dir=str(data_dir))
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "v": 1,
+                "ts": "2026-03-07T10:00:00+00:00",
+                "domain": "eng",
+                "kind": "artifact",
+                "data": {"text": "already saved", "github_event_id": "100"},
+                "tags": [],
+                "source": "github",
+            }
+        ],
+    )
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+    monkeypatch.setattr(mod, "_fetch_github_events", lambda u, t: [_github_push_event("100")])
 
-    assert applied["source_count"] == 3
-    assert applied["written_count"] == 2
-    assert applied["skipped_count"] == 1
-    assert len(read_sqlite(data_dir / "events.db")) == 2
+    result = mod.github_ingest(username="user", data_dir=str(data_dir))
+
+    assert result == {"saved": 0, "skipped": 1, "failed": 0}
+    assert len(read_sqlite(data_dir / "events.db")) == 1
 
 
 def test_cli_storage_migration_dry_run_json_output(

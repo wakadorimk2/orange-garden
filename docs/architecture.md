@@ -15,18 +15,24 @@ personal-mcp-core
     ├── core/
     │   └── guide.py         ← load_ai_guide(): loads AI_GUIDE.md
     ├── adapters/
-    │   └── mcp_server.py    ← get_system_context(): MCP-facing interface
-    └── server.py            ← CLI entrypoint
+    │   ├── mcp_server.py    ← get_system_context(): MCP-facing interface
+    │   └── http_server.py   ← web-serve HTTP adapter (mobile log form)
+    ├── tools/               ← one module per domain (event, daily_summary, github_*, …)
+    ├── storage/             ← storage boundary: events_store, jsonl, sqlite, path
+    └── server.py            ← subcommand CLI entrypoint (personal-mcp)
 ```
 
-**Data flow**: `server.py` → `adapters/mcp_server.py` → `core/guide.py` → `AI_GUIDE.md`
+**Data flow**: `server.py` → `tools/*` / `adapters/*` → `storage/*` / `core/guide.py` → `AI_GUIDE.md` / `data/`
 
 ## Layer responsibilities
 
 | Layer | Module | Responsibility |
 |-------|--------|----------------|
-| Entrypoint | `server.py` | CLI entry; wires adapters together |
+| Entrypoint | `server.py` | Subcommand CLI; parses args and dispatches to tools/adapters |
 | Adapter | `adapters/mcp_server.py` | Translates MCP protocol to internal calls |
+| Adapter | `adapters/http_server.py` | HTTP server for mobile log form (`web-serve`) |
+| Tools | `tools/*.py` | Domain logic: event, daily_summary, github_*, worker, poe2 |
+| Storage | `storage/events_store.py` | Storage boundary: read/write events (DB + JSONL dual-write) |
 | Core | `core/guide.py` | Loads and caches the AI guide text |
 | Data | `AI_GUIDE.md` | The guide content itself |
 
@@ -49,13 +55,13 @@ When MCP tools are introduced, they go in `src/personal_mcp/tools/`.
 Each tool file should expose a single function and a `TOOL_DEFINITION` dict
 (following the MCP tool schema).
 
-Document each tool in `docs/tools.md` when that file is created.
+Document each tool in `docs/adapters.md` or a new `docs/tools/<name>.md` file.
 
 ### Adding storage / memory
 
 Persistent storage (daily logs, habit data, game state) belongs in
-`src/personal_mcp/storage/`. Design the data model in `docs/data-flow.md` first,
-then implement.
+`src/personal_mcp/storage/`. Design the data model against
+`docs/event-contract-v1.md` (the authoritative event schema), then implement.
 
 Data-dir resolution is a CLI concern in `src/personal_mcp/server.py`.
 Resolution order is `--data-dir`, `PERSONAL_MCP_DATA_DIR`, then the XDG default.
@@ -113,11 +119,16 @@ This avoids path-resolution fragility in deployed contexts.
 
 Tradeoff: manual sync is required. Accepted because the file changes rarely.
 
-### Why server.py is a placeholder
+### Why server.py is the CLI entrypoint
 
-The real MCP server requires an MCP library dependency (e.g., `mcp` or `fastmcp`).
-That dependency has not been added yet to keep the package installable without
-external requirements. The placeholder prints context length to verify the load path.
+`server.py` exposes a multi-subcommand CLI (via `argparse`) registered as the
+`personal-mcp` console script in `pyproject.toml`. Key subcommands include
+`event-add`, `event-today`, `event-list`, `web-serve`, `summary-generate`,
+`github-ingest`, and storage-maintenance commands (`storage-db-to-jsonl`,
+`storage-jsonl-to-db`).
+
+Running `python -m personal_mcp.server` without a subcommand exits with a usage
+error. Always supply a subcommand (or `--help`) when invoking it directly.
 
 ## Event schema
 
@@ -129,8 +140,8 @@ external requirements. The placeholder prints context length to verify the load 
 
 All domains (poe2, mood, general, eng, worklog) converge to a single `Event` type so that:
 
-- Storage code (`append_jsonl`) needs no domain-specific branches.
-- History can be reconstructed from JSONL files alone, without domain knowledge.
+- Storage boundary code needs no domain-specific branches.
+- History can be reconstructed from Event Contract records without domain knowledge.
 - Future adapters can filter or aggregate events using the common `domain` and optional `tags` fields.
 
 ### v1 record fields
@@ -150,7 +161,7 @@ All domains (poe2, mood, general, eng, worklog) converge to a single `Event` typ
 
 `tags` / `source` / `ref` は optional（省略可）。required keys は正典の「Required top-level keys」に従う。
 
-### JSONL example
+### Event record example
 
 ```python
 from personal_mcp.core.event import build_v1_record
@@ -158,7 +169,7 @@ from personal_mcp.core.event import build_v1_record
 record = build_v1_record(
     ts="2026-03-04T11:00:00+00:00",
     domain="eng",
-    text="JSONL append-only方針を確認",
+    text="DB-only runtime と recovery 境界を確認",
     tags=["schema"],
     kind="milestone",
 )
@@ -167,10 +178,10 @@ record = build_v1_record(
 #   "ts": "2026-03-04T11:00:00+00:00",
 #   "domain": "eng",
 #   "kind": "milestone",
-#   "data": {"text": "JSONL append-only方針を確認"},
+#   "data": {"text": "DB-only runtime と recovery 境界を確認"},
 #   "tags": ["schema"]
 # }
 ```
 
-`build_v1_record` の結果はそのまま `append_jsonl(path, record)` に渡せる。
-legacy record（`payload` 形式）は `read_jsonl` が読み込み時に v1 形状へ正規化する（`storage/jsonl.py:_normalize_event_record`）。
+`build_v1_record` の結果は runtime storage と recovery migration の両方で使う正規レコード形状である。
+legacy record（`payload` 形式）は recovery path の `read_jsonl` が読み込み時に v1 形状へ正規化する（`storage/jsonl.py:_normalize_event_record`）。

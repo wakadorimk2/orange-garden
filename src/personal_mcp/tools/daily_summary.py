@@ -79,7 +79,6 @@ def get_latest_summary(date: str, data_dir: Optional[str] = None) -> Optional[Di
 
 
 def _is_display_population_record(record: Dict[str, Any]) -> bool:
-    """Return True for shipped heatmap density records."""
     if record.get("domain") == "summary":
         return False
     return record.get("source") != "web-form-ui"
@@ -130,9 +129,22 @@ def _count_events_by_date_filtered(
 def count_events_by_date(days: int = 28, data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
     """Return [{date, count}] for the last `days` local days (0-count days included).
 
-    The returned `count` is `shipped_density` as defined in
-    `docs/heatmap-state-density-spec.md`:
-    summary artifacts and `source="web-form-ui"` telemetry are excluded.
+    The returned ``count`` is ``shipped_density`` as defined in
+    ``docs/heatmap-state-density-spec.md`` Section 3 (Issue #312 / #317):
+
+        shipped_density[date] = count(events WHERE
+            local_date(ts) == date
+            AND domain != "summary"
+            AND source != "web-form-ui"
+        )
+
+    Excluded per observation layer (Section 2):
+    - ``domain == "summary"``: derived data (daily summary artifacts)
+    - ``source == "web-form-ui"``: UI telemetry (system-generated, weight 0)
+
+    The ``weight 0 (exclude)`` decision and its rationale are in Section 4 of the
+    spec. debug surface (``raw_count`` / ``telemetry_count``) is #256 scope;
+    color scale is #257 scope — both are out of scope for #317.
     """
     rows = read_events(data_dir=data_dir)
     return _count_events_by_date_filtered(rows, days, _is_display_population_record)

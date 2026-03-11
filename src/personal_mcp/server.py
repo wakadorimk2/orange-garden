@@ -16,6 +16,12 @@ from personal_mcp.tools.daily_summary import generate_daily_summary
 from personal_mcp.tools.github_sync import github_sync
 from personal_mcp.tools.github_ingest import github_ingest
 from personal_mcp.tools.poe2_client_watcher import watch_client_log
+from personal_mcp.tools.worker import (
+    ALLOWED_WORKER_STATUSES,
+    format_worker_board,
+    worker_board_rows,
+    worker_status_set,
+)
 
 
 def _cmd_web_serve(args) -> int:
@@ -105,6 +111,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_mood.add_argument("--tags", default="")
     p_mood.add_argument("--data-dir", default=None)
 
+    p_worker_status = sub.add_parser(
+        "worker-status-set",
+        help="append an AI worker status event",
+    )
+    p_worker_status.add_argument("--worker-id", required=True)
+    p_worker_status.add_argument("--worker-name", default=None)
+    p_worker_status.add_argument("--terminal-id", required=True)
+    p_worker_status.add_argument("--current-issue", default=None)
+    p_worker_status.add_argument("--status", required=True, choices=sorted(ALLOWED_WORKER_STATUSES))
+    p_worker_status.add_argument("--data-dir", default=None)
+
+    p_worker_board = sub.add_parser(
+        "ai-board",
+        aliases=["worker-board"],
+        help="display the latest AI worker board",
+    )
+    p_worker_board.add_argument("--data-dir", default=None)
+    p_worker_board.add_argument("--json", action="store_true")
+
     p_log = sub.add_parser(
         "poe2-log-add", help="append a poe2 log entry"
     )  # legacy: use event-add --domain poe2
@@ -171,7 +196,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_summary.add_argument("--json", action="store_true")
     p_db_to_jsonl = sub.add_parser(
         "storage-db-to-jsonl",
-        help="recovery-only: regenerate events.jsonl from events.db",
+        help="recovery-only maintenance: regenerate events.jsonl from events.db",
     )
     p_db_to_jsonl.add_argument("--data-dir", default=None)
     p_db_to_jsonl.add_argument("--dry-run", action="store_true")
@@ -179,7 +204,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_jsonl_to_db = sub.add_parser(
         "storage-jsonl-to-db",
         help=(
-            "recovery-only: faithful reconstruction of events.db "
+            "recovery-only maintenance: faithfully reconstruct events.db "
             "from events.jsonl (no dedup applied)"
         ),
     )
@@ -244,6 +269,26 @@ def main(argv: Optional[List[str]] = None) -> int:
             data_dir=data_dir,
         )
         print(json.dumps(rec, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.cmd == "worker-status-set":
+        rec = worker_status_set(
+            worker_id=args.worker_id,
+            worker_name=args.worker_name,
+            terminal_id=args.terminal_id,
+            current_issue=args.current_issue,
+            status=args.status,
+            data_dir=data_dir,
+        )
+        print(json.dumps(rec, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.cmd in {"ai-board", "worker-board"}:
+        rows = worker_board_rows(data_dir=data_dir)
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False, indent=2))
+        else:
+            print(format_worker_board(rows))
         return 0
 
     if args.cmd == "poe2-log-add":

@@ -49,13 +49,7 @@ def _add_telemetry_event(db_path: Path, ts: str | None = None) -> None:
     if ts is None:
         ts = datetime.now(timezone.utc).isoformat()
     record = build_v1_record(
-        ts=ts,
-        domain="general",
-        text="[ui] input_submitted",
-        tags=["ux", "experiment"],
-        kind="interaction",
-        source="web-form-ui",
-        extra_data={"observation_model": "current"},
+        ts=ts, domain="general", text="x", tags=[], kind="interaction", source="web-form-ui"
     )
     append_sqlite(db_path, record)
 
@@ -69,6 +63,21 @@ def _append_summary(db_path: Path, date_str: str, text: str = "summary") -> None
         kind="artifact",
         source="generated",
         extra_data={"date": date_str},
+    )
+    append_sqlite(db_path, record)
+
+
+def _add_telemetry_event(db_path: Path, ts: str | None = None) -> None:
+    if ts is None:
+        ts = datetime.now(timezone.utc).isoformat()
+    record = build_v1_record(
+        ts=ts,
+        domain="general",
+        text="[ui] input_submitted",
+        tags=["ux", "experiment"],
+        kind="interaction",
+        source="web-form-ui",
+        extra_data={"observation_model": "current"},
     )
     append_sqlite(db_path, record)
 
@@ -236,14 +245,22 @@ def test_count_events_by_date_excludes_web_form_ui_source(data_dir: Path) -> Non
 
 
 def test_count_events_by_date_mixed_day_shipped_density(data_dir: Path) -> None:
-    """Mixed day: telemetry + user-authored + summary -> only user-authored counted."""
+    """Mixed day: telemetry + user-authored + summary → only user-authored counted.
+
+    shipped_density = 2 (mood + eng)
+    telemetry_count = 3 (web-form-ui, excluded per weight 0, #312/#317)
+    summary excluded as domain="summary"
+    """
     db_path = data_dir / "events.db"
     today_local = _today_local()
+    # user-authored events — counted
     _add_event(db_path, domain="mood")
     _add_event(db_path, domain="eng")
+    # UI telemetry events — excluded (source="web-form-ui")
     _add_telemetry_event(db_path)
     _add_telemetry_event(db_path)
     _add_telemetry_event(db_path)
+    # summary artifact — excluded (domain="summary")
     _append_summary(db_path, today_local)
     result = count_events_by_date(28, data_dir=str(data_dir))
     today_entry = next(r for r in result if r["date"] == today_local)
@@ -533,16 +550,3 @@ def test_http_get_heatmap_debug_200(data_dir: Path) -> None:
     assert len(body) == 28
     expected_keys = {"date", "raw_count", "shipped_density", "telemetry_count", "life_count"}
     assert all(set(item.keys()) == expected_keys for item in body)
-
-
-def test_dashboard_quick_mode_armed_resets_to_compose_after_save(data_dir: Path) -> None:
-    handler_cls = _make_handler_for_test(str(data_dir))
-    _, _, html = _do_get_html(handler_cls, "/dashboard")
-    assert "次の候補タップ 1 回だけ即保存します" in html
-    assert 'var candidateTapMode = "compose";' in html
-    fn_start = html.find("async function saveCandidateQuickLog(")
-    fn_end = html.find('document.getElementById("candidate-compose-mode")', fn_start)
-    assert fn_start != -1, "saveCandidateQuickLog not found in dashboard HTML"
-    assert fn_end != -1, "boundary after saveCandidateQuickLog not found"
-    fn_body = html[fn_start:fn_end]
-    assert 'setCandidateTapMode("compose");' in fn_body

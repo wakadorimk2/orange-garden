@@ -50,10 +50,13 @@ ls -lh <backup-dir>/
 
 ```sh
 ls -lh <data-dir>/
-wc -l <data-dir>/events.jsonl
+<<<<<<< HEAD
+ls -lh <data-dir>/events.db
+=======
+>>>>>>> origin/main
 ```
 
-正本がまだ読み取れる状態であれば、復元前に現状を別の場所に退避しておくことを検討する。
+runtime は `events.db` を正本とする。復元前に `events.db` の有無を確認し、正本がまだ読み取れる状態であれば現状を別の場所に退避しておくことを検討する。
 
 ---
 
@@ -65,11 +68,21 @@ wc -l <data-dir>/events.jsonl
 rsync -av <backup-dir>/ <data-dir>/
 ```
 
-### 特定ファイルのみ復元する場合
+### 正本ファイル (`events.db`) のみ復元する場合
 
 ```sh
-rsync -av <backup-dir>/events.jsonl <data-dir>/events.jsonl
+rsync -av <backup-dir>/events.db <data-dir>/events.db
 ```
+
+### `events.jsonl` だけが残っているバックアップを復元する場合
+
+`events.db` がなく `events.jsonl` だけが復元元に残っている場合は、まず compat file を戻し、その後に migration tool で `events.db` を再生成する。
+
+```sh
+rsync -av <backup-dir>/events.db <data-dir>/events.db
+```
+
+`events.jsonl` は通常運用の正本ではない。復旧用コピーも併せて戻したい場合だけ、別途 `events.jsonl` を復元する。
 
 ---
 
@@ -95,22 +108,24 @@ rsync -av <backup-dir>/events.jsonl <data-dir>/events.jsonl
 
 ## 復元後の確認手順
 
-### 1. ファイルの存在と行数を確認する
+### 1. 正本ファイルの存在を確認する
 
 ```sh
 ls -lh <data-dir>/
-wc -l <data-dir>/events.jsonl
+ls -lh <data-dir>/events.db
 ```
 
-### 2. 最新レコードを目視確認する
+`events.db` が存在すれば runtime の正本は戻っている。`events.jsonl` は recovery 用なので、なくてもただちに runtime 異常とはみなさない。
 
 ```sh
-tail -n 5 <data-dir>/events.jsonl
+personal-mcp event-list --n 5 --data-dir <data-dir>
 ```
 
-### 3. 片方向欠損時は migration tool で再生成する
+### 3. 必要な場合だけ recovery 用 migration tool を明示実行する
 
-`events.db` / `events.jsonl` どちらかが欠損した場合は、まず dry-run で件数差分を確認する。
+runtime は `events.db` のみを参照する。`events.jsonl` が必要なのは、復旧時に明示的に再生成または再取込したい場合だけである。
+
+`events.jsonl` を再生成したい、または `events.db` を `events.jsonl` から復旧したい場合は、まず dry-run で件数差分を確認する。
 
 ```sh
 # events.db -> events.jsonl 再生成（dry-run）
@@ -123,7 +138,7 @@ personal-mcp storage-jsonl-to-db --dry-run --json --data-dir <data-dir>
 dry-run の結果が想定どおりであれば、実際に再生成する。
 
 ```sh
-# events.db を正として events.jsonl を再生成
+# events.db を正として recovery 用 events.jsonl を再生成
 personal-mcp storage-db-to-jsonl --data-dir <data-dir>
 
 # events.jsonl を元に events.db を再生成
@@ -132,10 +147,16 @@ personal-mcp storage-jsonl-to-db --data-dir <data-dir>
 
 > **Note**: `storage-jsonl-to-db` は JSONL の内容を **忠実に再構築** する（dedup なし）。
 > JSONL に重複レコードが含まれる場合、DB にも同数のレコードが挿入される。
-> 将来の重複排除は runtime の `github-sync` / `github-ingest` が担う。
+> runtime の重複排除は `github-sync` / `github-ingest` が担う。
 > この挙動は「復元はデータの回収であり、内容の修正ではない」という原則と一致する。
 
+<<<<<<< HEAD
+これらの command は recovery-only 保守コマンドであり、通常運用の互換経路ではない。
+
 ### 4. `event-list` で読み取れることを確認する
+=======
+### 3. `event-list` で runtime が読み取れることを確認する
+>>>>>>> origin/main
 
 ```sh
 personal-mcp event-list --n 10 --data-dir <data-dir>
@@ -163,9 +184,14 @@ personal-mcp event-list --since YYYY-MM-DD --data-dir <data-dir>
 - [ ] バックアップ後の追記分の有無を確認した（回収できないデータの把握）
 - [ ] 復元先の data-dir が repo 外であることを確認した
 - [ ] `--delete` を使わない形で rsync を実行した
-- [ ] 復元後、`ls` でファイルの存在を確認した
-- [ ] 復元後、`wc -l` でレコード数を確認した
+<<<<<<< HEAD
+- [ ] 復元後、`events.db` の存在を確認した
 - [ ] 復元後、`personal-mcp event-list` で読み取れることを確認した
+=======
+- [ ] 復元後、`ls` で `events.db` を含むファイルの存在を確認した
+- [ ] `events.db` が欠損していた場合は migration tool で再生成した
+- [ ] 復元後、`personal-mcp event-list` で runtime が読み取れることを確認した
+>>>>>>> origin/main
 - [ ] 最新レコードのタイムスタンプが想定の範囲内であることを確認した
 
 ---
