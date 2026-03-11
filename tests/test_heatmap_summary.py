@@ -40,6 +40,16 @@ def _add_event(db_path: Path, domain: str = "mood", ts: str | None = None) -> No
     append_sqlite(db_path, record)
 
 
+def _add_telemetry_event(db_path: Path, ts: str | None = None) -> None:
+    """Add a UI telemetry event (source="web-form-ui") excluded by shipped_density."""
+    if ts is None:
+        ts = datetime.now(timezone.utc).isoformat()
+    record = build_v1_record(
+        ts=ts, domain="general", text="x", tags=[], kind="interaction", source="web-form-ui"
+    )
+    append_sqlite(db_path, record)
+
+
 def _append_summary(db_path: Path, date_str: str, text: str = "summary") -> None:
     record = build_v1_record(
         ts=datetime.now(timezone.utc).isoformat(),
@@ -79,6 +89,7 @@ def _new_handler(handler_cls, path: str):
     handler.rfile = io.BytesIO(b"")
     handler.wfile = io.BytesIO()
     handler.path = path
+    handler.requestline = f"GET {path} HTTP/1.1"
     handler.request_version = "HTTP/1.1"
     return handler
 
@@ -100,6 +111,16 @@ def _do_get_html(handler_cls, path: str) -> Tuple[List[int], Dict[str, str], str
     handler.end_headers = lambda: None
     handler.do_GET()
     return statuses, headers, handler.wfile.getvalue().decode("utf-8")
+
+
+class _BrokenPipeWriter:
+    def write(self, _payload: bytes) -> int:
+        raise BrokenPipeError(32, "Broken pipe")
+
+
+class _ConnectionResetWriter:
+    def write(self, _payload: bytes) -> int:
+        raise ConnectionResetError(104, "Connection reset by peer")
 
 
 def test_count_events_by_date_returns_28_entries(data_dir: Path) -> None:
@@ -140,6 +161,38 @@ def test_count_events_by_date_sorted_ascending(data_dir: Path) -> None:
     result = count_events_by_date(28, data_dir=str(data_dir))
     dates = [item["date"] for item in result]
     assert dates == sorted(dates)
+
+
+def test_count_events_by_date_excludes_web_form_ui_source(data_dir: Path) -> None:
+    """Telemetry-only day: shipped_density == 0 (source="web-form-ui" excluded)."""
+    db_path = data_dir / "events.db"
+    _add_telemetry_event(db_path)
+    result = count_events_by_date(28, data_dir=str(data_dir))
+    today_entry = next(r for r in result if r["date"] == _today_local())
+    assert today_entry["count"] == 0
+
+
+def test_count_events_by_date_mixed_day_shipped_density(data_dir: Path) -> None:
+    """Mixed day: telemetry + user-authored + summary → only user-authored counted.
+
+    shipped_density = 2 (mood + eng)
+    telemetry_count = 3 (web-form-ui, excluded per weight 0, #312/#317)
+    summary excluded as domain="summary"
+    """
+    db_path = data_dir / "events.db"
+    today_local = _today_local()
+    # user-authored events — counted
+    _add_event(db_path, domain="mood")
+    _add_event(db_path, domain="eng")
+    # UI telemetry events — excluded (source="web-form-ui")
+    _add_telemetry_event(db_path)
+    _add_telemetry_event(db_path)
+    _add_telemetry_event(db_path)
+    # summary artifact — excluded (domain="summary")
+    _append_summary(db_path, today_local)
+    result = count_events_by_date(28, data_dir=str(data_dir))
+    today_entry = next(r for r in result if r["date"] == today_local)
+    assert today_entry["count"] == 2
 
 
 def test_list_summaries_empty_when_no_summaries(data_dir: Path) -> None:
@@ -235,6 +288,23 @@ def test_http_get_heatmap_200(data_dir: Path) -> None:
     assert all("date" in item and "count" in item for item in body)
 
 
+def test_http_get_heatmap_returns_shipped_density_for_mixed_day(data_dir: Path) -> None:
+    db_path = data_dir / "events.db"
+    today_local = _today_local()
+    _add_event(db_path, domain="mood")
+    _add_event(db_path, domain="eng")
+    _add_telemetry_event(db_path)
+    _add_telemetry_event(db_path)
+    _append_summary(db_path, today_local)
+
+    handler_cls = _make_handler_for_test(str(data_dir))
+    status, body = _do_get_json(handler_cls, "/api/heatmap")[0]
+
+    assert status == 200
+    today_entry = next(r for r in body if r["date"] == today_local)
+    assert today_entry["count"] == 2
+
+
 def test_http_get_summaries_list_200_empty(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     status, body = _do_get_json(handler_cls, "/api/summaries/list")[0]
@@ -302,6 +372,20 @@ def test_http_get_dashboard_candidate_tap_script_exists(data_dir: Path) -> None:
     assert 'await fetch("/api/candidates")' in html
 
 
+def test_http_get_dashboard_ignores_broken_pipe_from_client_disconnect(data_dir: Path) -> None:
+    handler_cls = _make_handler_for_test(str(data_dir))
+    handler = _new_handler(handler_cls, "/dashboard")
+    handler.wfile = _BrokenPipeWriter()
+    handler.do_GET()
+
+
+def test_http_get_health_ignores_connection_reset_from_client_disconnect(data_dir: Path) -> None:
+    handler_cls = _make_handler_for_test(str(data_dir))
+    handler = _new_handler(handler_cls, "/health")
+    handler.wfile = _ConnectionResetWriter()
+    handler.do_GET()
+
+
 def test_http_get_dashboard_fallback_candidates_match_fixed_candidates(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     _, _, html = _do_get_html(handler_cls, "/dashboard")
@@ -331,7 +415,7 @@ def test_debug_fields_present(data_dir: Path) -> None:
         assert set(item.keys()) == expected_keys
 
 
-def test_debug_raw_count_matches_heatmap(data_dir: Path) -> None:
+def test_debug_shipped_density_matches_heatmap(data_dir: Path) -> None:
     db_path = data_dir / "events.db"
     _add_event(db_path, domain="mood")
     _add_event(db_path, domain="eng")
@@ -340,16 +424,18 @@ def test_debug_raw_count_matches_heatmap(data_dir: Path) -> None:
     debug = count_events_by_date_debug(28, data_dir=str(data_dir))
     heatmap_by_date = {item["date"]: item["count"] for item in heatmap}
     for item in debug:
-        assert item["raw_count"] == heatmap_by_date[item["date"]]
+        assert item["shipped_density"] == heatmap_by_date[item["date"]]
 
 
-def test_debug_shipped_density_equals_raw_count(data_dir: Path) -> None:
+def test_debug_raw_count_includes_telemetry(data_dir: Path) -> None:
     db_path = data_dir / "events.db"
     _add_event(db_path)
     _add_telemetry_event(db_path)
     result = count_events_by_date_debug(28, data_dir=str(data_dir))
-    for item in result:
-        assert item["shipped_density"] == item["raw_count"]
+    today_entry = next(item for item in result if item["date"] == _today_local())
+    assert today_entry["raw_count"] == 2
+    assert today_entry["shipped_density"] == 1
+    assert today_entry["telemetry_count"] == 1
 
 
 def test_debug_telemetry_count_identifies_web_form_ui(data_dir: Path) -> None:
@@ -371,6 +457,7 @@ def test_debug_life_count_equals_raw_minus_telemetry(data_dir: Path) -> None:
     result = count_events_by_date_debug(28, data_dir=str(data_dir))
     today_entry = next(item for item in result if item["date"] == _today_local())
     assert today_entry["life_count"] == today_entry["raw_count"] - today_entry["telemetry_count"]
+    assert today_entry["life_count"] == today_entry["shipped_density"]
 
 
 def test_debug_excludes_summary(data_dir: Path) -> None:
