@@ -79,11 +79,24 @@ def get_latest_summary(date: str, data_dir: Optional[str] = None) -> Optional[Di
 
 
 def count_events_by_date(days: int = 28, data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Return [{date, count}] for the last `days` local days, including 0-count days.
+    """Return [{date, count}] for the last `days` local days (0-count days included).
 
-    This is the current MVP feed for `/api/heatmap`: raw non-summary event counts.
-    Heatmap semantics are defined separately in `docs/heatmap-state-density-spec.md`
-    (Issue #253), and follow-up issues may replace this with a layer-aware aggregate.
+    The returned ``count`` is ``shipped_density`` as defined in
+    ``docs/heatmap-state-density-spec.md`` Section 3 (Issue #312 / #317):
+
+        shipped_density[date] = count(events WHERE
+            local_date(ts) == date
+            AND domain != "summary"
+            AND source != "web-form-ui"
+        )
+
+    Excluded per observation layer (Section 2):
+    - ``domain == "summary"``: derived data (daily summary artifacts)
+    - ``source == "web-form-ui"``: UI telemetry (system-generated, weight 0)
+
+    The ``weight 0 (exclude)`` decision and its rationale are in Section 4 of the
+    spec. debug surface (``raw_count`` / ``telemetry_count``) is #256 scope;
+    color scale is #257 scope — both are out of scope for #317.
     """
     if days <= 0:
         return []
@@ -95,6 +108,8 @@ def count_events_by_date(days: int = 28, data_dir: Optional[str] = None) -> List
 
     for r in read_events(data_dir=data_dir):
         if r.get("domain") == "summary":
+            continue
+        if r.get("source") == "web-form-ui":  # telemetry: weight 0 (shipped_density, #312/#317)
             continue
         d = _local_date(r.get("ts", ""))
         if d and d in buckets:

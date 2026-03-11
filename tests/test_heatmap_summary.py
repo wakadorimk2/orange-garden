@@ -39,6 +39,16 @@ def _add_event(db_path: Path, domain: str = "mood", ts: str | None = None) -> No
     append_sqlite(db_path, record)
 
 
+def _add_telemetry_event(db_path: Path, ts: str | None = None) -> None:
+    """Add a UI telemetry event (source="web-form-ui") excluded by shipped_density."""
+    if ts is None:
+        ts = datetime.now(timezone.utc).isoformat()
+    record = build_v1_record(
+        ts=ts, domain="general", text="x", tags=[], kind="interaction", source="web-form-ui"
+    )
+    append_sqlite(db_path, record)
+
+
 def _append_summary(db_path: Path, date_str: str, text: str = "summary") -> None:
     record = build_v1_record(
         ts=datetime.now(timezone.utc).isoformat(),
@@ -138,6 +148,38 @@ def test_count_events_by_date_sorted_ascending(data_dir: Path) -> None:
     assert dates == sorted(dates)
 
 
+def test_count_events_by_date_excludes_web_form_ui_source(data_dir: Path) -> None:
+    """Telemetry-only day: shipped_density == 0 (source="web-form-ui" excluded)."""
+    db_path = data_dir / "events.db"
+    _add_telemetry_event(db_path)
+    result = count_events_by_date(28, data_dir=str(data_dir))
+    today_entry = next(r for r in result if r["date"] == _today_local())
+    assert today_entry["count"] == 0
+
+
+def test_count_events_by_date_mixed_day_shipped_density(data_dir: Path) -> None:
+    """Mixed day: telemetry + user-authored + summary → only user-authored counted.
+
+    shipped_density = 2 (mood + eng)
+    telemetry_count = 3 (web-form-ui, excluded per weight 0, #312/#317)
+    summary excluded as domain="summary"
+    """
+    db_path = data_dir / "events.db"
+    today_local = _today_local()
+    # user-authored events — counted
+    _add_event(db_path, domain="mood")
+    _add_event(db_path, domain="eng")
+    # UI telemetry events — excluded (source="web-form-ui")
+    _add_telemetry_event(db_path)
+    _add_telemetry_event(db_path)
+    _add_telemetry_event(db_path)
+    # summary artifact — excluded (domain="summary")
+    _append_summary(db_path, today_local)
+    result = count_events_by_date(28, data_dir=str(data_dir))
+    today_entry = next(r for r in result if r["date"] == today_local)
+    assert today_entry["count"] == 2
+
+
 def test_list_summaries_empty_when_no_summaries(data_dir: Path) -> None:
     assert list_summaries(28, data_dir=str(data_dir)) == []
 
@@ -229,6 +271,23 @@ def test_http_get_heatmap_200(data_dir: Path) -> None:
     assert status == 200
     assert len(body) == 28
     assert all("date" in item and "count" in item for item in body)
+
+
+def test_http_get_heatmap_returns_shipped_density_for_mixed_day(data_dir: Path) -> None:
+    db_path = data_dir / "events.db"
+    today_local = _today_local()
+    _add_event(db_path, domain="mood")
+    _add_event(db_path, domain="eng")
+    _add_telemetry_event(db_path)
+    _add_telemetry_event(db_path)
+    _append_summary(db_path, today_local)
+
+    handler_cls = _make_handler_for_test(str(data_dir))
+    status, body = _do_get_json(handler_cls, "/api/heatmap")[0]
+
+    assert status == 200
+    today_entry = next(r for r in body if r["date"] == today_local)
+    assert today_entry["count"] == 2
 
 
 def test_http_get_summaries_list_200_empty(data_dir: Path) -> None:
