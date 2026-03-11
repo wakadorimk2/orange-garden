@@ -31,6 +31,19 @@ def _today_local_noon() -> str:
     )
 
 
+def _github_push_event(event_id: str = "100") -> dict:
+    return {
+        "id": event_id,
+        "type": "PushEvent",
+        "repo": {"name": "user/repo"},
+        "created_at": "2026-03-07T10:00:00Z",
+        "payload": {
+            "ref": "refs/heads/main",
+            "commits": [{"sha": "abc1234567890"}],
+        },
+    }
+
+
 def test_rebuild_jsonl_from_db_dry_run_and_apply(data_dir: Path) -> None:
     db_path = data_dir / "events.db"
     jsonl_path = data_dir / "events.jsonl"
@@ -245,6 +258,62 @@ def test_poe2_log_list_text_shows_question_mark_after_recovery_migration(
     captured = capsys.readouterr()
     assert "[?]" in captured.out
     assert "legacy no-kind" in captured.out
+
+
+def test_github_sync_skips_duplicate_after_recovery_migration(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import personal_mcp.tools.github_sync as mod
+
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "v": 1,
+                "ts": "2026-03-07T10:00:00+00:00",
+                "domain": "eng",
+                "kind": "artifact",
+                "data": {"text": "already saved", "github_event_id": "100"},
+                "tags": [],
+                "source": "github",
+            }
+        ],
+    )
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+    monkeypatch.setattr(mod, "_fetch_github_events", lambda u, t: [_github_push_event("100")])
+
+    result = mod.github_sync(username="user", data_dir=str(data_dir))
+
+    assert result == {"saved": 0, "skipped": 1, "failed": 0}
+    assert len(read_sqlite(data_dir / "events.db")) == 1
+
+
+def test_github_ingest_skips_duplicate_after_recovery_migration(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import personal_mcp.tools.github_ingest as mod
+
+    _write_events(
+        data_dir / "events.jsonl",
+        [
+            {
+                "v": 1,
+                "ts": "2026-03-07T10:00:00+00:00",
+                "domain": "eng",
+                "kind": "artifact",
+                "data": {"text": "already saved", "github_event_id": "100"},
+                "tags": [],
+                "source": "github",
+            }
+        ],
+    )
+    rebuild_db_from_jsonl(data_dir=str(data_dir))
+    monkeypatch.setattr(mod, "_fetch_github_events", lambda u, t: [_github_push_event("100")])
+
+    result = mod.github_ingest(username="user", data_dir=str(data_dir))
+
+    assert result == {"saved": 0, "skipped": 1, "failed": 0}
+    assert len(read_sqlite(data_dir / "events.db")) == 1
 
 
 def test_cli_storage_migration_dry_run_json_output(
