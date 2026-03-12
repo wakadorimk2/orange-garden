@@ -5,10 +5,27 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 from personal_mcp.core.event import build_v1_record
-from personal_mcp.storage.events_store import append_event
+from personal_mcp.storage.events_store import append_event, read_events
 
 
 _SKIP_TYPES: frozenset = frozenset({"WatchEvent", "PublicEvent", "MemberEvent"})
+
+
+def _load_existing_github_event_ids(data_dir: Optional[str] = None) -> set[str]:
+    """Return github_event_id values already stored in runtime events.
+
+    github_sync no longer uses a pre-read for dedup; storage-boundary UNIQUE
+    handling is the source of truth. This helper remains as a read-only utility
+    for tests and diagnostics.
+    """
+    ids: set[str] = set()
+    for record in read_events(data_dir=data_dir):
+        if record.get("source") != "github":
+            continue
+        github_event_id = record.get("data", {}).get("github_event_id")
+        if github_event_id:
+            ids.add(str(github_event_id))
+    return ids
 
 
 def _fetch_github_events(username: str, token: Optional[str]) -> List[Dict[str, Any]]:
