@@ -98,9 +98,7 @@ def test_notify_dispatches_to_custom_adapter_directory(tmp_path: Path) -> None:
 def test_notify_kind_can_override_channel(tmp_path: Path) -> None:
     capture = tmp_path / "capture"
     capture.write_text(
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "printf 'channel=%s\\n' \"$NOTIFY_CHANNEL_NAME\"\n",
+        "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'channel=%s\\n' \"$NOTIFY_CHANNEL_NAME\"\n",
         encoding="utf-8",
     )
     capture.chmod(capture.stat().st_mode | stat.S_IXUSR)
