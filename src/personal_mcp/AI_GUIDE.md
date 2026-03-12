@@ -136,6 +136,13 @@
 - `ruff check .` / `ruff format --check .` は `pyproject.toml` の設定をそのまま読む前提です
 - AI 向けガイドや runbook の記述と矛盾した場合は、Ruff 設定については `pyproject.toml` を優先してください
 
+## Repository language policy
+
+- Issue本文とPR本文は日本語で記述してください
+- GitHubのclosing keyword（`Closes` / `Fixes` / `Refs` / `Resolves`）だけは英語のまま維持してください
+- commit message は日本語でも英語でも構いません
+- コード識別子、API名、CLI引数、ファイル名は無理に日本語化しないでください
+
 ---
 
 ## 互換性に関するガードレール

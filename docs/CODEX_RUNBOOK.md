@@ -292,33 +292,33 @@ EOF
 ## PR Body Template
 
 ```md
-## Linked Issue
+## 関連Issue
 - Closes #<issue-number>
 <!-- close しない場合は `Refs #<issue-number>` に置き換え、必要なら linked issue を手動設定する -->
 
-## Summary
-- What changed:
-- Why:
+## 概要
+- 変更内容:
+- 理由:
 
-## Validation
+## 検証
 - python: `<python --version>`
 - ruff: `<ruff --version>`
 - pytest: `<pytest --version>`
 - `ruff check .`: `<pass/fail>`
 - `pytest`: `<pass/fail>`
 
-## Review Notes
-- Scope:
-- Behavior change:
-- Risks:
-- Mitigation:
+## レビューノート
+- スコープ:
+- 挙動変更:
+- リスク:
+- 緩和策:
 
-## Minimal Fix
-- Applied:
-- Reason:
+## 最小修正
+- 適用内容:
+- 理由:
 
-## Next Issues
-- None / <follow-up issue candidate>
+## 次のIssue
+- なし / <後続 issue 候補>
 ```
 
 ## 完了時に残すもの
