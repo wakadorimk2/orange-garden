@@ -52,9 +52,9 @@ def _single_line(text: str, limit: int = 80) -> str:
     return f"{compact[: limit - 3].rstrip()}..."
 
 
-def _notify_args(payload: dict[str, object]) -> list[str]:
+def _notify_args(payload: dict[str, object], *, smoke_test: bool = False) -> list[str]:
     raw_type = _payload_text(payload, "type") or "agent-turn-complete"
-    kind = _RAW_TYPE_TO_KIND.get(raw_type)
+    kind = "smoke_test" if smoke_test else _RAW_TYPE_TO_KIND.get(raw_type)
     source = _payload_text(payload, "client") or "codex"
     input_messages = _payload_list(payload, "input-messages", "input_messages")
     title = _single_line(input_messages[-1]) if input_messages else "Codex task completed"
@@ -67,13 +67,26 @@ def _notify_args(payload: dict[str, object]) -> list[str]:
     return [str(notify), *event_args, "--title", title, "--source", source, message]
 
 
+def _parse_cli_args(argv: list[str]) -> tuple[bool, str] | None:
+    if len(argv) == 2:
+        return False, argv[1]
+    if len(argv) == 3 and argv[1] == "--smoke-test":
+        return True, argv[2]
+    return None
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: codex_notify.py '<codex notify json payload>'", file=sys.stderr)
+    parsed = _parse_cli_args(sys.argv)
+    if parsed is None:
+        print(
+            "usage: codex_notify.py [--smoke-test] '<codex notify json payload>'",
+            file=sys.stderr,
+        )
         return 2
+    smoke_test, payload_arg = parsed
 
     try:
-        payload = json.loads(sys.argv[1])
+        payload = json.loads(payload_arg)
     except json.JSONDecodeError as exc:
         print(f"codex_notify.py: invalid JSON payload: {exc}", file=sys.stderr)
         return 2
@@ -82,7 +95,7 @@ def main() -> int:
         print("codex_notify.py: payload must be a JSON object", file=sys.stderr)
         return 2
 
-    result = subprocess.run(_notify_args(payload), check=False)
+    result = subprocess.run(_notify_args(payload, smoke_test=smoke_test), check=False)
     return result.returncode
 
 
