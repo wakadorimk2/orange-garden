@@ -32,3 +32,4 @@ PYTHONPATH=src python -m personal_mcp.server heatmap-density-audit --json --data
 - `earliest_real_data_date` は `domain != "summary"` の最古 local day を使う
 - `all_time_reference` は pre-history を含めず、実データ開始前の空白日は混ぜない
 - `/api/heatmap` と `/api/heatmap/debug` の semantics は変更しない
+- 実測 snapshot: `docs/heatmap-density-audit-2026-03-12.md`
