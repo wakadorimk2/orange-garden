@@ -328,9 +328,10 @@ payload shape into this repo's `scripts/notify` wrapper.
 1. Add a `notify` entry to `~/.codex/config.toml` with an absolute path to this
    repo's bridge script.
 2. Export Discord delivery variables in the shell environment that launches
-   Codex. For smoke tests, use `NOTIFY_CHANNEL=discord-test` with
-   `DISCORD_WEBHOOK_AI_STATUS_TEST`; for day-to-day delivery, use `discord` with
-   `DISCORD_WEBHOOK_AI_STATUS`.
+   Codex. For day-to-day delivery, use `discord` with
+   `DISCORD_WEBHOOK_AI_STATUS`. For smoke tests, call
+   `scripts/codex_notify.py --smoke-test` and provide
+   `DISCORD_WEBHOOK_AI_STATUS_TEST`.
 3. Run a dry-run locally through `scripts/codex_notify.py` before attempting a
    real Discord delivery.
 
@@ -350,7 +351,6 @@ export DISCORD_WEBHOOK_AI_STATUS="https://discord.com/api/webhooks/..."
 Smoke-test delivery environment:
 
 ```bash
-export NOTIFY_CHANNEL=discord-test
 export DISCORD_WEBHOOK_AI_STATUS_TEST="https://discord.com/api/webhooks/..."
 ```
 
@@ -386,12 +386,15 @@ Path and shell assumptions:
 Current mapping for Codex task completion:
 
 - `type = "agent-turn-complete"` -> `notify --event task_completed`
+- `--smoke-test` -> `notify --kind smoke_test`
 - top-level `client` -> `--source` (`codex-tui` など)
 - `input-messages` / `input_messages` の末尾 -> `--title`
 - `last-assistant-message` -> MESSAGE
 
 The bridge keeps `scripts/notify` as the single notification entrypoint, so
-channel selection still comes from `NOTIFY_CHANNEL` / `NOTIFY_CHANNEL_DIR`.
+channel selection for day-to-day delivery still comes from `NOTIFY_CHANNEL` /
+`NOTIFY_CHANNEL_DIR`. `--smoke-test` uses kind routing and lands on
+`discord-test`.
 
 ### Dry-run verification
 
@@ -414,9 +417,10 @@ shell, then rerun the command above. A successful Discord webhook send produces
 no stdout output and exits with code `0`.
 
 For smoke tests that must not reach the prod webhook, switch to
-`NOTIFY_CHANNEL=discord-test` and provide `DISCORD_WEBHOOK_AI_STATUS_TEST` instead.
-If that test webhook is missing, the adapter exits with code `2` and does not
-fall back to `DISCORD_WEBHOOK_AI_STATUS`.
+`scripts/codex_notify.py --smoke-test` and provide
+`DISCORD_WEBHOOK_AI_STATUS_TEST` instead. If that test webhook is missing, the
+adapter exits with code `2` and does not fall back to
+`DISCORD_WEBHOOK_AI_STATUS`.
 
 Real Discord smoke-test evidence is now recorded in
 [`docs/infra/ai-cli-discord-smoke-log.md`](./ai-cli-discord-smoke-log.md), so
