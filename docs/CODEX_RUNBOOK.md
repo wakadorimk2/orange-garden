@@ -258,6 +258,13 @@ git commit -m "docs: add CODEX_RUNBOOK for executor flow"
 
 目的: 実行結果と残リスクを残してレビューに渡す。
 
+linked issue ルール:
+
+- 対応 Issue を PR 本文に 1 件以上明記する
+- merge 時に Issue を閉じる場合は `Closes #<issue-number>` / `Fixes #<issue-number>` / `Resolves #<issue-number>` を使う
+- merge 時に閉じない場合は `Refs #<issue-number>` を書き、必要なら GitHub 上で linked issue を手動設定する
+- PR title 末尾の `(#123)` や本文中の単なる `#123` 記載だけでは linked issue とみなさない
+
 コマンド例:
 
 ```bash
@@ -285,29 +292,33 @@ EOF
 ## PR Body Template
 
 ```md
-## Summary
-- What changed:
-- Why:
+## 関連Issue
+- Closes #<issue-number>
+<!-- close しない場合は `Refs #<issue-number>` に置き換え、必要なら linked issue を手動設定する -->
 
-## Validation
+## 概要
+- 変更内容:
+- 理由:
+
+## 検証
 - python: `<python --version>`
 - ruff: `<ruff --version>`
 - pytest: `<pytest --version>`
 - `ruff check .`: `<pass/fail>`
 - `pytest`: `<pass/fail>`
 
-## Review Notes
-- Scope:
-- Behavior change:
-- Risks:
-- Mitigation:
+## レビューノート
+- スコープ:
+- 挙動変更:
+- リスク:
+- 緩和策:
 
-## Minimal Fix
-- Applied:
-- Reason:
+## 最小修正
+- 適用内容:
+- 理由:
 
-## Next Issues
-- None / <follow-up issue candidate>
+## 次のIssue
+- なし / <後続 issue 候補>
 ```
 
 ## 完了時に残すもの

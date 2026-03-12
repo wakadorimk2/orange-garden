@@ -57,6 +57,13 @@ def _write_secret_file(home: Path, content: str) -> Path:
     return secret_file
 
 
+def _write_test_secret_file(home: Path, content: str) -> Path:
+    secret_file = home / ".config" / "secrets" / "discord_test_webhook.env"
+    secret_file.parent.mkdir(parents=True, exist_ok=True)
+    secret_file.write_text(content, encoding="utf-8")
+    return secret_file
+
+
 def _load_payload(args_file: Path) -> tuple[list[str], dict[str, object]]:
     args = args_file.read_text(encoding="utf-8").splitlines()
     payload = json.loads(args[args.index("--data") + 1])
@@ -67,7 +74,7 @@ def test_notify_discord_channel_posts_expected_payload(tmp_path: Path) -> None:
     _, args_file = _write_fake_curl(tmp_path)
     env = {
         **_fake_curl_env(tmp_path, args_file),
-        "DISCORD_WEBHOOK_URL": "https://discord.example/webhook",
+        "DISCORD_WEBHOOK_AI_STATUS": "https://discord.example/webhook",
         "DISCORD_WEBHOOK_USERNAME": "Codex",
         "DISCORD_WEBHOOK_AVATAR_URL": "https://example.com/avatar.png",
     }
@@ -100,7 +107,9 @@ def test_notify_discord_channel_posts_expected_payload(tmp_path: Path) -> None:
 def test_notify_discord_channel_uses_secret_file_fallback(tmp_path: Path) -> None:
     _, args_file = _write_fake_curl(tmp_path)
     home = tmp_path / "home"
-    _write_secret_file(home, 'export DISCORD_WEBHOOK_URL="https://discord.example/from-file"\n')
+    _write_secret_file(
+        home, 'export DISCORD_WEBHOOK_AI_STATUS="https://discord.example/from-file"\n'
+    )
 
     result = _run_notify(
         "--channel",
@@ -125,7 +134,9 @@ def test_notify_discord_channel_uses_secret_file_fallback(tmp_path: Path) -> Non
 def test_notify_discord_channel_prefers_env_over_secret_file(tmp_path: Path) -> None:
     _, args_file = _write_fake_curl(tmp_path)
     home = tmp_path / "home"
-    _write_secret_file(home, 'export DISCORD_WEBHOOK_URL="https://discord.example/from-file"\n')
+    _write_secret_file(
+        home, 'export DISCORD_WEBHOOK_AI_STATUS="https://discord.example/from-file"\n'
+    )
 
     result = _run_notify(
         "--channel",
@@ -134,7 +145,7 @@ def test_notify_discord_channel_prefers_env_over_secret_file(tmp_path: Path) -> 
         env={
             **_fake_curl_env(tmp_path, args_file),
             "HOME": str(home),
-            "DISCORD_WEBHOOK_URL": "https://discord.example/from-env",
+            "DISCORD_WEBHOOK_AI_STATUS": "https://discord.example/from-env",
         },
     )
 
@@ -160,7 +171,7 @@ def test_notify_discord_channel_errors_without_env_or_secret_file(tmp_path: Path
     )
 
     assert result.returncode == 2
-    assert "DISCORD_WEBHOOK_URL is required" in result.stderr
+    assert "DISCORD_WEBHOOK_AI_STATUS is required" in result.stderr
     assert not args_file.exists()
 
 
@@ -168,7 +179,7 @@ def test_notify_discord_channel_errors_for_http_failure(tmp_path: Path) -> None:
     _, args_file = _write_fake_curl(tmp_path)
     env = {
         **_fake_curl_env(tmp_path, args_file),
-        "DISCORD_WEBHOOK_URL": "https://discord.example/webhook",
+        "DISCORD_WEBHOOK_AI_STATUS": "https://discord.example/webhook",
         "FAKE_CURL_STDOUT": "500",
     }
 
@@ -183,7 +194,7 @@ def test_notify_discord_channel_errors_for_transport_failure(tmp_path: Path) -> 
     _, args_file = _write_fake_curl(tmp_path)
     env = {
         **_fake_curl_env(tmp_path, args_file),
-        "DISCORD_WEBHOOK_URL": "https://discord.example/webhook",
+        "DISCORD_WEBHOOK_AI_STATUS": "https://discord.example/webhook",
         "FAKE_CURL_STDOUT": "",
         "FAKE_CURL_STDERR": "curl: (7) failed to connect",
         "FAKE_CURL_EXIT_CODE": "7",
@@ -195,3 +206,130 @@ def test_notify_discord_channel_errors_for_transport_failure(tmp_path: Path) -> 
     assert result.stdout == ""
     assert "curl: (7) failed to connect" in result.stderr
     assert "webhook POST failed" in result.stderr
+
+
+def test_notify_discord_test_channel_posts_expected_payload(tmp_path: Path) -> None:
+    _, args_file = _write_fake_curl(tmp_path)
+    env = {
+        **_fake_curl_env(tmp_path, args_file),
+        "DISCORD_WEBHOOK_AI_STATUS_TEST": "https://discord.example/test-webhook",
+    }
+
+    result = _run_notify(
+        "--channel",
+        "discord-test",
+        "--event",
+        "task_completed",
+        "--title",
+        "Issue #336",
+        "--source",
+        "codex-tui",
+        "Smoke notification routed to test webhook",
+        env=env,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    args, payload = _load_payload(args_file)
+    assert args[-1] == "https://discord.example/test-webhook"
+    assert payload == {
+        "content": (
+            "**Issue #336**\n"
+            "Smoke notification routed to test webhook\n"
+            "[`task_completed` from `codex-tui`]"
+        ),
+    }
+
+
+def test_notify_discord_test_channel_uses_secret_file_fallback(tmp_path: Path) -> None:
+    _, args_file = _write_fake_curl(tmp_path)
+    home = tmp_path / "home"
+    _write_test_secret_file(
+        home,
+        'export DISCORD_WEBHOOK_AI_STATUS_TEST="https://discord.example/test-from-file"\n',
+    )
+
+    result = _run_notify(
+        "--channel",
+        "discord-test",
+        "hello",
+        env={
+            **_fake_curl_env(tmp_path, args_file),
+            "HOME": str(home),
+        },
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    args, payload = _load_payload(args_file)
+    assert args[-1] == "https://discord.example/test-from-file"
+    assert payload == {
+        "content": "hello\n[`generic`]",
+    }
+
+
+def test_notify_discord_test_channel_prefers_env_over_secret_file(tmp_path: Path) -> None:
+    _, args_file = _write_fake_curl(tmp_path)
+    home = tmp_path / "home"
+    _write_test_secret_file(
+        home,
+        'export DISCORD_WEBHOOK_AI_STATUS_TEST="https://discord.example/test-from-file"\n',
+    )
+
+    result = _run_notify(
+        "--channel",
+        "discord-test",
+        "hello",
+        env={
+            **_fake_curl_env(tmp_path, args_file),
+            "HOME": str(home),
+            "DISCORD_WEBHOOK_AI_STATUS_TEST": "https://discord.example/test-from-env",
+        },
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    args, _ = _load_payload(args_file)
+    assert args[-1] == "https://discord.example/test-from-env"
+
+
+def test_notify_discord_test_channel_errors_without_env_or_secret_file(tmp_path: Path) -> None:
+    _, args_file = _write_fake_curl(tmp_path)
+    home = tmp_path / "home"
+
+    result = _run_notify(
+        "--channel",
+        "discord-test",
+        "hello",
+        env={
+            **_fake_curl_env(tmp_path, args_file),
+            "HOME": str(home),
+        },
+    )
+
+    assert result.returncode == 2
+    assert "DISCORD_WEBHOOK_AI_STATUS_TEST is required" in result.stderr
+    assert not args_file.exists()
+
+
+def test_notify_discord_test_channel_does_not_fallback_to_prod_webhook(tmp_path: Path) -> None:
+    _, args_file = _write_fake_curl(tmp_path)
+    home = tmp_path / "home"
+
+    result = _run_notify(
+        "--channel",
+        "discord-test",
+        "hello",
+        env={
+            **_fake_curl_env(tmp_path, args_file),
+            "HOME": str(home),
+            "DISCORD_WEBHOOK_AI_STATUS": "https://discord.example/prod-webhook",
+        },
+    )
+
+    assert result.returncode == 2
+    assert "DISCORD_WEBHOOK_AI_STATUS_TEST is required" in result.stderr
+    assert not args_file.exists()
