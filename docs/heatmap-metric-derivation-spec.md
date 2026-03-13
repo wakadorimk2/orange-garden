@@ -341,7 +341,61 @@ It only fixes the conceptual boundary that downstream issues must respect.
 
 ---
 
-## 11. Downstream Implications
+## 11. Step 6 - Downstream Issue Contract
+
+Step 6 records how other issues should consume the decisions made in `#407`.
+
+### 11.1 Downstream responsibility matrix
+
+| issue | consumes from `#407` | must not redefine | expected output |
+|---|---|---|---|
+| `#257` | background rationale for why raw daily counts are unstable across families | source-family normalization or derivation seam | bucket / scale decision record |
+| `#355` | successor metric-side input contract before bucket mapping | source-family grouping logic, normalization rationale | shared bucket mapping contract |
+| `#360` | baseline vs future-derived comparison boundary | shipped default metric or primary UX semantics | developer inspection support |
+| `#408` | assumption that a daily metric input exists before range aggregation | source-family daily derivation semantics | near/far aggregation policy |
+
+### 11.2 Specific impact notes
+
+#### `#257`
+
+`#257` remains the decision record for bucket and scale strategy.
+
+Issue `#407` can explain why bucket decisions must not be mistaken for normalization, but it does not reopen bucket policy itself.
+
+#### `#355`
+
+`#355` should consume the metric-side output after derivation, not recreate derivation logic inside bucket mapping.
+
+If `#355` needs input assumptions, it should reference:
+
+- current baseline semantics for backward understanding
+- future derived heatmap-ready value as the intended successor input
+
+#### `#360`
+
+`#360` is the correct place to compare:
+
+- raw view
+- current shipped baseline
+- future normalized or derived view
+
+But it should remain a validation surface, not the place where derivation meaning is created.
+
+#### `#408`
+
+`#408` works one layer later in the pipeline.
+
+It may define how daily inputs are aggregated across near, mid, and far ranges, but it should consume the daily metric contract rather than redesign source-family normalization.
+
+### 11.3 Step 6 decision
+
+Issue `#407` is the source of truth for metric-side daily derivation semantics before bucket mapping and range aggregation.
+
+Downstream issues may consume that contract in different ways, but they should not fork its terminology or move derivation logic into UI or aggregation layers.
+
+---
+
+## 12. Downstream Implications
 
 ### For `#355`
 
@@ -357,7 +411,7 @@ It only fixes the conceptual boundary that downstream issues must respect.
 
 ---
 
-## 12. Decision Summary Through Step 5
+## 13. Decision Summary Through Step 6
 
 - keep current `/api/heatmap` semantics fixed as the baseline
 - treat current shipped heatmap as `display_population`, not raw activity count
@@ -367,10 +421,11 @@ It only fixes the conceptual boundary that downstream issues must respect.
 - allow compression or cap only after a family-aware seam exists
 - define a four-stage metric pipeline before bucket mapping and UI consumption
 - separate the current baseline metric from the future derived successor contract
+- treat `#407` as the source of truth for metric-side daily derivation semantics
 
 ---
 
-## 13. References
+## 14. References
 
 - `docs/heatmap-state-density-spec.md`
 - `docs/heatmap-density-audit-2026-03-12.md`
