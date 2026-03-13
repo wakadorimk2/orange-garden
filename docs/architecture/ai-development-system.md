@@ -190,9 +190,11 @@ This issue does not:
 
 - redesign worker protocol specs
 - merge runtime runbooks or skill docs
+- absorb the local Project Active appendix currently retained in `docs/AI_WORKFLOW.md`
 - complete `docs/` index, stub, and backlink cleanup
 
 Handoff boundary:
 
 - runbook / skill consolidation goes to `#418`
+- Project Active appendix reevaluation stays as follow-up ops-workflow work
 - index / stub / backlink completion goes to `#419`

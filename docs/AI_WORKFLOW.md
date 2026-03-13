@@ -156,6 +156,10 @@ git fetch -p origin
 
 ## 7. GitHub Project Active管理ルール（試行）
 
+この節は、`#417` 時点では canonical parent に吸収していない
+**local appendix** として残す。
+development system 全体の topology ではなく、現行の ops 運用メモとして扱う。
+
 この節は、Project を「TODO 一覧」ではなく「active management の作業面」にするための最小ルールを定義する。
 試行期間は **2026-03-09 から 2026-03-22（2週間）** とし、期間後に閾値と運用を見直す。
 
