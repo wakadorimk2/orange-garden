@@ -24,6 +24,16 @@ Issue `#257` 向けの shipped heatmap bucket / scale decision record。
 - active data window (`2026-03-08` .. `2026-03-12`) の `shipped_density` は `7..41` に収まり、単一 outlier に支配されていない
 - そのため、現時点では dataset 依存の再計算より stable fixed buckets のほうが `#355` と `#356` の source of truth として扱いやすい
 
+## Fixed vs Relative
+
+| option | pros | cons | result |
+|---|---|---|---|
+| fixed scale | bucket の意味を固定できる / renderer 間で共有しやすい / legend と palette の前提を安定化できる | 新しい分布に対して再調整が要る可能性がある | 採用 |
+| relative scale | dataset の密度分布に追従しやすい / sparse period でも濃淡差を出しやすい | 現 snapshot の 365 日窓では percentile が `0` に潰れる / bucket の意味が dataset 依存になる / `#355` と `#356` の source of truth として不安定 | 不採用 |
+
+relative scale を完全に否定するわけではないが、2026-03-12 時点の監査結果では shipped UI の決定基準としては弱い。
+今後、365 日窓の実データが十分に蓄積し、percentile が 0 collapse しなくなった時点で再評価対象とする。
+
 ## Downstream Contract
 
 - `#355` はこの bucket contract を shared mapping layer の正本として実装する
