@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 
@@ -160,3 +161,192 @@ def parse_worker_claim_comment(body: str) -> Optional[Dict[str, Any]]:
         ref=values.get("ref"),
         target_worker_id=values.get("target_worker_id"),
     )
+
+
+def _parse_comment_timestamp(value: Any) -> datetime:
+    if not isinstance(value, str) or not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _comment_order_key(comment: Dict[str, Any]) -> tuple[datetime, int]:
+    comment_id = comment.get("id")
+    numeric_id = comment_id if isinstance(comment_id, int) else -1
+    return (_parse_comment_timestamp(comment.get("created_at")), numeric_id)
+
+
+def _comment_id_as_ref(comment: Dict[str, Any]) -> str:
+    comment_id = comment.get("id")
+    if isinstance(comment_id, int):
+        return str(comment_id)
+    if isinstance(comment_id, str) and comment_id.strip():
+        return comment_id.strip()
+    raise ValueError("worker claim comment is missing id")
+
+
+def _comment_actor_login(comment: Dict[str, Any]) -> Optional[str]:
+    user = comment.get("user")
+    if not isinstance(user, dict):
+        return None
+    login = user.get("login")
+    if not isinstance(login, str):
+        return None
+    normalized = login.strip()
+    return normalized or None
+
+
+def derive_worker_claim_state(
+    comments: list[Dict[str, Any]],
+    *,
+    issue_number: int | str,
+    repo_owner: str,
+) -> Dict[str, Any]:
+    normalized_issue_number = _normalize_issue_number(issue_number)
+    normalized_repo_owner = _normalize_required(repo_owner, field_name="repo_owner")
+
+    state: Dict[str, Any] = {
+        "state": "unclaimed",
+        "owner": None,
+        "claim_ref": None,
+        "handoff_target_worker_id": None,
+        "offer_ref": None,
+        "events": [],
+    }
+
+    for comment in sorted(comments, key=_comment_order_key):
+        body = comment.get("body")
+        if not isinstance(body, str):
+            continue
+
+        parsed_event: Optional[Dict[str, Any]]
+        invalid_reason: Optional[str] = None
+        valid = False
+
+        try:
+            parsed_event = parse_worker_claim_comment(body)
+        except ValueError as exc:
+            parsed_event = None
+            if body.strip().startswith(PROTOCOL_MARKER):
+                invalid_reason = str(exc)
+        if parsed_event is None:
+            if invalid_reason is None:
+                continue
+        else:
+            if parsed_event["issue_number"] != normalized_issue_number:
+                invalid_reason = (
+                    "issue_number does not match requested issue "
+                    f"{normalized_issue_number}"
+                )
+            else:
+                event_type = parsed_event["event_type"]
+                event_ref = parsed_event.get("ref")
+                current_state = state["state"]
+                current_owner = state["owner"]
+                claim_ref = state["claim_ref"]
+                offer_ref = state["offer_ref"]
+                target_worker_id = state["handoff_target_worker_id"]
+                comment_ref = _comment_id_as_ref(comment)
+                actor_login = _comment_actor_login(comment)
+
+                if event_type == "claim":
+                    if current_state == "unclaimed":
+                        state["state"] = "claimed"
+                        state["owner"] = parsed_event["worker_id"]
+                        state["claim_ref"] = comment_ref
+                        state["handoff_target_worker_id"] = None
+                        state["offer_ref"] = None
+                        valid = True
+                    else:
+                        invalid_reason = f"claim requires unclaimed state, got {current_state}"
+                elif event_type == "release":
+                    if current_state == "unclaimed":
+                        invalid_reason = "release requires an active claim"
+                    elif parsed_event["worker_id"] != current_owner:
+                        invalid_reason = "release requires the current owner"
+                    elif event_ref != claim_ref:
+                        invalid_reason = f"release ref must match active claim ref {claim_ref}"
+                    else:
+                        state["state"] = "unclaimed"
+                        state["owner"] = None
+                        state["claim_ref"] = None
+                        state["handoff_target_worker_id"] = None
+                        state["offer_ref"] = None
+                        valid = True
+                elif event_type == "handoff_offer":
+                    if current_state != "claimed":
+                        invalid_reason = (
+                            f"handoff_offer requires claimed state, got {current_state}"
+                        )
+                    elif parsed_event["worker_id"] != current_owner:
+                        invalid_reason = "handoff_offer requires the current owner"
+                    elif event_ref != claim_ref:
+                        invalid_reason = (
+                            f"handoff_offer ref must match active claim ref {claim_ref}"
+                        )
+                    else:
+                        state["state"] = "handoff_pending"
+                        state["handoff_target_worker_id"] = parsed_event["target_worker_id"]
+                        state["offer_ref"] = comment_ref
+                        valid = True
+                elif event_type == "handoff_accept":
+                    if current_state != "handoff_pending":
+                        invalid_reason = (
+                            f"handoff_accept requires handoff_pending state, got {current_state}"
+                        )
+                    elif parsed_event["worker_id"] != target_worker_id:
+                        invalid_reason = "handoff_accept requires the handoff target worker"
+                    elif event_ref != offer_ref:
+                        invalid_reason = (
+                            f"handoff_accept ref must match latest offer ref {offer_ref}"
+                        )
+                    else:
+                        state["state"] = "claimed"
+                        state["owner"] = parsed_event["worker_id"]
+                        state["claim_ref"] = comment_ref
+                        state["handoff_target_worker_id"] = None
+                        state["offer_ref"] = None
+                        valid = True
+                elif event_type == "maintainer_override":
+                    if current_state == "unclaimed":
+                        invalid_reason = "maintainer_override requires an active claim or handoff"
+                    elif actor_login != normalized_repo_owner:
+                        invalid_reason = (
+                            "maintainer_override requires the repository owner "
+                            f"{normalized_repo_owner}"
+                        )
+                    else:
+                        expected_ref = (
+                            offer_ref if current_state == "handoff_pending" else claim_ref
+                        )
+                        if event_ref != expected_ref:
+                            invalid_reason = (
+                                "maintainer_override ref must match the current "
+                                f"active ref {expected_ref}"
+                            )
+                        else:
+                            state["state"] = "unclaimed"
+                            state["owner"] = None
+                            state["claim_ref"] = None
+                            state["handoff_target_worker_id"] = None
+                            state["offer_ref"] = None
+                            valid = True
+
+        state["events"].append(
+            {
+                "comment_id": comment.get("id"),
+                "created_at": comment.get("created_at"),
+                "actor_login": _comment_actor_login(comment),
+                "valid": valid,
+                "invalid_reason": invalid_reason,
+                "event": parsed_event,
+            }
+        )
+
+    return state
