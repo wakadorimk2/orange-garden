@@ -395,7 +395,47 @@ Downstream issues may consume that contract in different ways, but they should n
 
 ---
 
-## 12. Downstream Implications
+## 12. Step 7 - Acceptance Mapping And Follow-up Boundary
+
+Step 7 makes this document usable as the completion artifact for Issue `#407`.
+
+### 12.1 Acceptance mapping
+
+| Issue `#407` acceptance criterion | Where this document answers it |
+|---|---|
+| raw source ごとの scale 差と問題点が明文化されている | Section 7 |
+| derived metric への変換パイプラインが文章で固定されている | Section 9 |
+| source normalization を renderer 側の調整で代替しない方針が明記されている | Section 8 |
+| `#257` `#355` `#360` への影響範囲が読める | Section 11 |
+
+### 12.2 Remaining work outside `#407`
+
+This document intentionally leaves the following to other issues:
+
+- exact bucket boundaries and bucket count -> `#257` and `#355`
+- runtime implementation of the successor contract -> follow-up implementation work under `#355`
+- developer comparison surface -> `#360`
+- near / mid / far range aggregation semantics -> `#408`
+- UI palette, interaction, detail, and history navigation -> UI epic issues under `#406`
+
+### 12.3 Invariants fixed by `#407`
+
+After this issue, downstream work should treat the following as fixed:
+
+- current shipped baseline and future derived metric are different layers
+- source-family skew is a metric-layer concern
+- bucket mapping starts after metric derivation, not before it
+- renderer-local tuning is not the primary answer to source-family skew
+
+### 12.4 Step 7 decision
+
+This document is intended to serve as the decision record for Issue `#407`.
+
+Later issues may add implementation details or runtime surfaces, but they should not need to restate the core metric-derivation argument captured here.
+
+---
+
+## 13. Downstream Implications
 
 ### For `#355`
 
@@ -411,7 +451,7 @@ Downstream issues may consume that contract in different ways, but they should n
 
 ---
 
-## 13. Decision Summary Through Step 6
+## 14. Decision Summary Through Step 7
 
 - keep current `/api/heatmap` semantics fixed as the baseline
 - treat current shipped heatmap as `display_population`, not raw activity count
@@ -422,10 +462,11 @@ Downstream issues may consume that contract in different ways, but they should n
 - define a four-stage metric pipeline before bucket mapping and UI consumption
 - separate the current baseline metric from the future derived successor contract
 - treat `#407` as the source of truth for metric-side daily derivation semantics
+- map the document directly to Issue `#407` acceptance criteria and follow-up boundaries
 
 ---
 
-## 14. References
+## 15. References
 
 - `docs/heatmap-state-density-spec.md`
 - `docs/heatmap-density-audit-2026-03-12.md`
