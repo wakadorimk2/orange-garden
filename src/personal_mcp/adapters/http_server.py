@@ -548,9 +548,9 @@ function buildDashboardFlowPayload(text, extraUiData) {
 
 function heatColor(n) {
   if (n === 0) return '#eeeeee';
-  if (n <= 2) return '#ffd9b3';
-  if (n <= 5) return '#ffaa55';
-  if (n <= 10) return '#ff7700';
+  if (n <= 4) return '#ffd9b3';
+  if (n <= 9) return '#ffaa55';
+  if (n <= 19) return '#ff7700';
   return '#cc4400';
 }
 

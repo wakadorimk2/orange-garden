@@ -351,6 +351,17 @@ def test_http_get_dashboard_200(data_dir: Path) -> None:
     assert "再読み込みに失敗しました。再試行してください。" in html
 
 
+def test_http_get_dashboard_uses_issue_257_provisional_thresholds(data_dir: Path) -> None:
+    handler_cls = _make_handler_for_test(str(data_dir))
+    _, _, html = _do_get_html(handler_cls, "/dashboard")
+    assert "if (n === 0) return '#eeeeee';" in html
+    assert "if (n <= 4) return '#ffd9b3';" in html
+    assert "if (n <= 9) return '#ffaa55';" in html
+    assert "if (n <= 19) return '#ff7700';" in html
+    assert "return '#cc4400';" in html
+    assert "if (n <= 2) return '#ffd9b3';" not in html
+
+
 def test_http_get_root_returns_dashboard_html(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     _, _, root_html = _do_get_html(handler_cls, "/")
