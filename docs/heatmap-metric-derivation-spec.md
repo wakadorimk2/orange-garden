@@ -386,6 +386,7 @@ But it should remain a validation surface, not the place where derivation meanin
 `#408` works one layer later in the pipeline.
 
 It may define how daily inputs are aggregated across near, mid, and far ranges, but it should consume the daily metric contract rather than redesign source-family normalization.
+The accepted definition is in `docs/heatmap-temporal-aggregation-spec.md`.
 
 ### 11.3 Step 6 decision
 
