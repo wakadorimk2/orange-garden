@@ -212,7 +212,86 @@ The seam should not require the renderer to rediscover source-level behavior on 
 
 ---
 
-## 9. Downstream Implications
+## 9. Step 4 - Metric Pipeline Definition
+
+Step 4 fixes the metric-side pipeline that converts source daily aggregates into a heatmap-ready value.
+
+The goal is to separate responsibilities so downstream issues do not redefine the same logic in different layers.
+
+### 9.1 Pipeline stages
+
+| stage | output | responsibility | does not decide |
+|---|---|---|---|
+| A. source daily aggregates | per-day counts or signals grouped by source family | preserve source-family distinction before mixing | bucket boundaries, palette, UI layout |
+| B. family-level normalization | comparable per-family daily signals | absorb family-specific scale differences | visual token count, temporal aggregation policy |
+| C. optional post-normalization compression/cap | bounded or compressed daily signal | keep burst days from dominating the combined metric | source-family grouping itself |
+| D. derived heatmap-ready value | one daily metric consumable by bucket mapping | provide a stable metric-side output contract | UI thresholds, legends, interaction behavior |
+
+### 9.2 Canonical flow
+
+The future metric-side flow should be read as:
+
+```text
+source daily aggregates
+-> family-level normalization
+-> optional post-normalization compression/cap
+-> derived heatmap-ready value
+-> bucket mapping contract (#355)
+-> palette / UI consumers
+```
+
+### 9.3 Stage responsibilities
+
+#### A. Source daily aggregates
+
+This stage keeps raw daily input separated by family.
+
+Examples:
+
+- manual life logging daily signal
+- GitHub-derived `eng` daily signal
+- excluded telemetry and summary families retained only for debug comparison
+
+#### B. Family-level normalization
+
+This stage makes family outputs comparable enough to combine.
+
+Its job is to answer:
+
+- how a bursty GitHub day compares with a sparse manual day
+- how family-specific volume should be reduced without erasing the presence of that family
+
+#### C. Optional post-normalization compression or cap
+
+This stage is explicitly optional.
+
+It exists because even after family-aware normalization, some days may still be too dominant for a reassurance-oriented heatmap.
+
+If used, it must run after family-level normalization, not instead of it.
+
+#### D. Derived heatmap-ready value
+
+This is the metric-side output that downstream issues consume.
+
+It is not yet a bucket index and not a palette token.
+It is the last numeric or ordinal value produced before `#355` maps it into shared buckets.
+
+### 9.4 Step 4 decision
+
+Issue `#407` defines the metric pipeline up to the derived heatmap-ready value.
+
+It does not define:
+
+- bucket boundaries or bucket count
+- palette token mapping
+- navigation or history rendering behavior
+- near/far aggregation policy
+
+Those remain with downstream issues.
+
+---
+
+## 10. Downstream Implications
 
 ### For `#355`
 
@@ -228,7 +307,7 @@ The seam should not require the renderer to rediscover source-level behavior on 
 
 ---
 
-## 10. Decision Summary Through Step 3
+## 11. Decision Summary Through Step 4
 
 - keep current `/api/heatmap` semantics fixed as the baseline
 - treat current shipped heatmap as `display_population`, not raw activity count
@@ -236,10 +315,11 @@ The seam should not require the renderer to rediscover source-level behavior on 
 - treat source-family scale gap as a metric-layer problem that remains unsolved in the current baseline
 - prefer per-family daily normalization over renderer-only adjustment
 - allow compression or cap only after a family-aware seam exists
+- define a four-stage metric pipeline before bucket mapping and UI consumption
 
 ---
 
-## 11. References
+## 12. References
 
 - `docs/heatmap-state-density-spec.md`
 - `docs/heatmap-density-audit-2026-03-12.md`
