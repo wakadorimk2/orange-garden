@@ -291,15 +291,65 @@ Those remain with downstream issues.
 
 ---
 
-## 10. Downstream Implications
+## 10. Step 5 - Transition Seam Between Current And Future Metrics
+
+Step 5 defines how later issues can introduce a future normalized metric without rewriting the meaning of the current shipped baseline.
+
+### 10.1 Separation of roles
+
+| term | role in Step 5 | notes |
+|---|---|---|
+| `shipped_density` | current shipped baseline metric | today’s `/api/heatmap` meaning; fixed for comparison |
+| `display_population` | current shipped counting set | baseline population, not a future normalization algorithm |
+| source daily aggregates | pre-mix family-level inputs | new internal seam for future derivation |
+| derived heatmap-ready value | future metric-side output before buckets | successor input contract for `#355` |
+
+### 10.2 Transition rule
+
+Issue `#407` does not require the repository to immediately replace `shipped_density`.
+
+Instead, it defines a transition seam:
+
+- current shipped semantics remain the comparison baseline
+- future metric work may add a derived heatmap-ready value behind a new contract
+- bucket mapping should depend on that future contract once introduced
+- debug or inspection flows may show both baseline and future-derived views side by side
+
+### 10.3 What must not happen during transition
+
+The transition should not:
+
+- silently change the meaning of `/api/heatmap` while keeping the same terminology
+- make UI consumers infer normalization rules from renderer-local thresholds
+- collapse current baseline and future-derived contract into the same undefined term
+
+### 10.4 Compatibility posture
+
+At the design level, Step 5 assumes two different responsibilities:
+
+- baseline semantics remain stable enough for comparison and migration reasoning
+- future derivation contract can evolve as a metric-layer concern before UI decisions are revisited
+
+That means later implementation should prefer an explicit seam over an in-place semantic rewrite.
+
+### 10.5 Step 5 decision
+
+Issue `#407` treats `shipped_density` as the baseline and a future derived heatmap-ready value as the successor contract.
+
+The issue does not yet standardize the implementation path for exposing both at runtime.
+It only fixes the conceptual boundary that downstream issues must respect.
+
+---
+
+## 11. Downstream Implications
 
 ### For `#355`
 
-`#355` should treat current `shipped_density` semantics as a fixed input meaning until Issue `#407` defines a successor normalized input contract.
+`#355` should treat current `shipped_density` semantics as a fixed baseline and move to the successor derived input only through an explicit shared contract.
 
 ### For `#360`
 
-`#360` can compare raw, shipped, and future normalized views, but should not redefine the shipped baseline here.
+`#360` can compare raw, shipped, and future normalized views, but should not redefine the baseline or invent the successor contract itself.
 
 ### For `#408`
 
@@ -307,7 +357,7 @@ Those remain with downstream issues.
 
 ---
 
-## 11. Decision Summary Through Step 4
+## 12. Decision Summary Through Step 5
 
 - keep current `/api/heatmap` semantics fixed as the baseline
 - treat current shipped heatmap as `display_population`, not raw activity count
@@ -316,10 +366,11 @@ Those remain with downstream issues.
 - prefer per-family daily normalization over renderer-only adjustment
 - allow compression or cap only after a family-aware seam exists
 - define a four-stage metric pipeline before bucket mapping and UI consumption
+- separate the current baseline metric from the future derived successor contract
 
 ---
 
-## 12. References
+## 13. References
 
 - `docs/heatmap-state-density-spec.md`
 - `docs/heatmap-density-audit-2026-03-12.md`
