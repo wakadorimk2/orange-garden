@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import urllib.request
 
 
 PROTOCOL_MARKER = "<!-- og-worker-claim:v1 -->"
@@ -350,3 +353,232 @@ def derive_worker_claim_state(
         )
 
     return state
+
+
+def _resolve_github_token(token: Optional[str]) -> str:
+    resolved = _normalize_optional(token) or os.environ.get("GH_TOKEN") or os.environ.get(
+        "GITHUB_TOKEN"
+    )
+    if not isinstance(resolved, str) or not resolved.strip():
+        raise ValueError("GitHub token is required; set --token, GH_TOKEN, or GITHUB_TOKEN")
+    return resolved.strip()
+
+
+def _github_request_json(
+    *,
+    method: str,
+    url: str,
+    token: str,
+    payload: Optional[Dict[str, Any]] = None,
+) -> Any:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    data = None
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(request) as response:
+        body = response.read().decode("utf-8")
+    return json.loads(body) if body else None
+
+
+def fetch_issue_comments(
+    *,
+    owner: str,
+    repo: str,
+    issue_number: int | str,
+    token: Optional[str] = None,
+) -> list[Dict[str, Any]]:
+    normalized_owner = _normalize_required(owner, field_name="owner")
+    normalized_repo = _normalize_required(repo, field_name="repo")
+    normalized_issue_number = _normalize_issue_number(issue_number)
+    resolved_token = _resolve_github_token(token)
+
+    comments: list[Dict[str, Any]] = []
+    per_page = 100
+    page = 1
+    while True:
+        page_url = (
+            f"https://api.github.com/repos/{normalized_owner}/{normalized_repo}/issues/"
+            f"{normalized_issue_number}/comments?per_page={per_page}&page={page}"
+        )
+        page_comments = _github_request_json(
+            method="GET",
+            url=page_url,
+            token=resolved_token,
+        )
+        if not isinstance(page_comments, list):
+            raise ValueError("GitHub issue comments response must be a list")
+        comments.extend(page_comments)
+        if len(page_comments) < per_page:
+            break
+        page += 1
+    return comments
+
+
+def worker_claim_state(
+    *,
+    owner: str,
+    repo: str,
+    issue_number: int | str,
+    token: Optional[str] = None,
+) -> Dict[str, Any]:
+    comments = fetch_issue_comments(
+        owner=owner,
+        repo=repo,
+        issue_number=issue_number,
+        token=token,
+    )
+    return derive_worker_claim_state(
+        comments,
+        issue_number=issue_number,
+        repo_owner=owner,
+    )
+
+
+def prepare_worker_claim_submission(
+    *,
+    owner: str,
+    repo: str,
+    issue_number: int | str,
+    event_type: str,
+    worker_id: str,
+    runtime: str,
+    reason: str,
+    token: Optional[str] = None,
+    ref: Optional[str] = None,
+    target_worker_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    state_before = worker_claim_state(
+        owner=owner,
+        repo=repo,
+        issue_number=issue_number,
+        token=token,
+    )
+    normalized_event_type = _normalize_event_type(event_type)
+    normalized_ref = _normalize_optional(ref)
+
+    if normalized_event_type == "claim":
+        if state_before["state"] != "unclaimed":
+            raise ValueError(f"claim requires unclaimed state, got {state_before['state']}")
+    elif normalized_event_type == "release":
+        if state_before["state"] == "unclaimed":
+            raise ValueError("release requires an active claim")
+        if state_before["owner"] != worker_id.strip():
+            raise ValueError("release requires the current owner worker_id")
+        normalized_ref = normalized_ref or state_before["claim_ref"]
+    elif normalized_event_type == "handoff_offer":
+        if state_before["state"] != "claimed":
+            raise ValueError(f"handoff_offer requires claimed state, got {state_before['state']}")
+        if state_before["owner"] != worker_id.strip():
+            raise ValueError("handoff_offer requires the current owner worker_id")
+        normalized_ref = normalized_ref or state_before["claim_ref"]
+    elif normalized_event_type == "handoff_accept":
+        if state_before["state"] != "handoff_pending":
+            raise ValueError(
+                f"handoff_accept requires handoff_pending state, got {state_before['state']}"
+            )
+        if state_before["handoff_target_worker_id"] != worker_id.strip():
+            raise ValueError("handoff_accept requires the handoff target worker_id")
+        normalized_ref = normalized_ref or state_before["offer_ref"]
+    else:
+        if state_before["state"] == "unclaimed":
+            raise ValueError("maintainer_override requires an active claim or handoff")
+        normalized_ref = normalized_ref or (
+            state_before["offer_ref"]
+            if state_before["state"] == "handoff_pending"
+            else state_before["claim_ref"]
+        )
+
+    event = build_worker_claim_event(
+        event_type=normalized_event_type,
+        worker_id=worker_id,
+        runtime=runtime,
+        issue_number=issue_number,
+        reason=reason,
+        ref=normalized_ref,
+        target_worker_id=target_worker_id,
+    )
+    return {
+        "event": event,
+        "comment_body": serialize_worker_claim_event(event),
+        "state_before": state_before,
+    }
+
+
+def post_issue_comment(
+    *,
+    owner: str,
+    repo: str,
+    issue_number: int | str,
+    body: str,
+    token: Optional[str] = None,
+) -> Dict[str, Any]:
+    normalized_owner = _normalize_required(owner, field_name="owner")
+    normalized_repo = _normalize_required(repo, field_name="repo")
+    normalized_issue_number = _normalize_issue_number(issue_number)
+    resolved_token = _resolve_github_token(token)
+    normalized_body = _normalize_required(body, field_name="body")
+
+    result = _github_request_json(
+        method="POST",
+        url=(
+            f"https://api.github.com/repos/{normalized_owner}/{normalized_repo}/issues/"
+            f"{normalized_issue_number}/comments"
+        ),
+        token=resolved_token,
+        payload={"body": normalized_body},
+    )
+    if not isinstance(result, dict):
+        raise ValueError("GitHub issue comment response must be an object")
+    return result
+
+
+def worker_claim_post(
+    *,
+    owner: str,
+    repo: str,
+    issue_number: int | str,
+    event_type: str,
+    worker_id: str,
+    runtime: str,
+    reason: str,
+    token: Optional[str] = None,
+    ref: Optional[str] = None,
+    target_worker_id: Optional[str] = None,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    prepared = prepare_worker_claim_submission(
+        owner=owner,
+        repo=repo,
+        issue_number=issue_number,
+        event_type=event_type,
+        worker_id=worker_id,
+        runtime=runtime,
+        reason=reason,
+        token=token,
+        ref=ref,
+        target_worker_id=target_worker_id,
+    )
+    result: Dict[str, Any] = {
+        "event": prepared["event"],
+        "comment_body": prepared["comment_body"],
+        "state_before": prepared["state_before"],
+        "dry_run": dry_run,
+    }
+    if dry_run:
+        return result
+
+    comment = post_issue_comment(
+        owner=owner,
+        repo=repo,
+        issue_number=issue_number,
+        body=prepared["comment_body"],
+        token=token,
+    )
+    result["comment"] = comment
+    return result
