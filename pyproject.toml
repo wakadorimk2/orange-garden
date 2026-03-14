@@ -15,6 +15,9 @@ dev = [
     "pre-commit>=4.0",
     "ruff>=0.3",
     "pytest>=8.0",
+    "build>=1.2",
+    "wheel>=0.45",
+    "setuptools>=68",
 ]
 
 [project.scripts]
@@ -27,7 +30,10 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-personal_mcp = ["AI_GUIDE.md"]
+personal_mcp = [
+    "AI_GUIDE.md",
+    "web/templates/*.html",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

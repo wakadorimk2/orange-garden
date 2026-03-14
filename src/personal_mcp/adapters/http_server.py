@@ -4,7 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
-from pathlib import Path
+from importlib.resources import files
 
 from personal_mcp.core.event import ALLOWED_DOMAINS
 from personal_mcp.tools.candidates import FIXED_CANDIDATES, list_candidates
@@ -19,10 +19,6 @@ from personal_mcp.tools.log_form import (
     event_add_sqlite,
     ui_event_add_sqlite,
 )
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-TEMPLATE_DIR = BASE_DIR / "web" / "templates"
-print(f"Using template dir: {TEMPLATE_DIR}", flush=True)
 
 # DOMAIN_OPTIONS / KIND_OPTIONS are replaced at render time via str.replace()
 _HTML = """\
@@ -355,12 +351,9 @@ renderSuggestion();
 
 
 def load_dashboard_html() -> str:
-    path = TEMPLATE_DIR / "dashboard.html"
-    if path.exists():
-        return path.read_text(encoding="utf-8")
-    else:
-        # fallback to embedded template
-        return """ this is fallback template. """
+    return (
+        files("personal_mcp.web.templates").joinpath("dashboard.html").read_text(encoding="utf-8")
+    )
 
 
 _DASHBOARD_HTML = load_dashboard_html().replace(
