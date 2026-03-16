@@ -37,6 +37,22 @@ than an adapter. In the current runtime, GitHub is handled by tool-layer CLI
 commands that fetch and normalize events before writing through the storage
 boundary.
 
+## Frontend build artifact handoff contract
+
+`pnpm build` in `frontend/` outputs artifacts to `src/personal_mcp/web/app/`
+(configured in `frontend/vite.config.ts`).
+
+| 項目 | 値 |
+|------|-----|
+| Vite `outDir` | `../src/personal_mcp/web/app` |
+| Python package 内パス | `personal_mcp/web/app/` |
+| Git 管理 | 除外（`.gitignore: src/personal_mcp/web/app/`） |
+| package-data | `pyproject.toml: "web/app/**"` |
+| Vite `base` | `/app/` |
+
+Python 側で `/app/` を配信する際は `importlib.resources.files("personal_mcp").joinpath("web/app")` を起点として読む。
+`/app/` 配信ロジックの runtime 実装はこの Issue のスコープ外（将来の別 Issue で実装）。
+
 ## Adding a new adapter
 
 1. Create `src/personal_mcp/adapters/<name>.py`
