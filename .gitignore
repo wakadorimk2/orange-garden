@@ -213,4 +213,5 @@ __marimo__/
 
 # Frontend (Vite + React)
 frontend/node_modules/
-frontend/dist/
+# build artifact は src/personal_mcp/web/app/ に出力される (#444)
+src/personal_mcp/web/app/

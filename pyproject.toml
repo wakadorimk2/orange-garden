@@ -33,6 +33,7 @@ where = ["src"]
 personal_mcp = [
     "AI_GUIDE.md",
     "web/templates/*.html",
+    "web/app/**",
 ]
 
 [tool.pytest.ini_options]

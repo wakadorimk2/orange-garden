@@ -37,6 +37,29 @@ than an adapter. In the current runtime, GitHub is handled by tool-layer CLI
 commands that fetch and normalize events before writing through the storage
 boundary.
 
+## Frontend build artifact handoff contract
+
+`pnpm build` in `frontend/` outputs artifacts to `src/personal_mcp/web/app/`
+(configured in `frontend/vite.config.ts`).
+
+| 項目 | 値 |
+|------|-----|
+| Vite `outDir` | `../src/personal_mcp/web/app` |
+| Python package 内パス | `personal_mcp/web/app/` |
+| Git 管理 | 除外（`.gitignore: src/personal_mcp/web/app/`） |
+| package-data | `pyproject.toml: "web/app/**"` |
+| Vite `base` | `/app/` |
+| `emptyOutDir` | `true`（ビルドごとに outDir 配下をクリアし stale artifact を除去する） |
+
+**`web/app/` は generated artifact** — 以下の制約に注意:
+
+- `pip wheel` / `python -m build` 前に必ず `pnpm build` を実行すること
+- ビルド未実施のままインストールした場合、`web/app/` はパッケージに含まれない（setuptools は存在しないパスを警告なく無視する）
+- `make frontend-check` でビルド成果物の存在を事前確認できる
+
+Python 側で `/app/` を配信する際は `importlib.resources.files("personal_mcp").joinpath("web/app")` を起点として読む。
+`/app/` 配信ロジックの runtime 実装はこのドキュメントのスコープ外（将来の別 PR で実装）。
+
 ## Adding a new adapter
 
 1. Create `src/personal_mcp/adapters/<name>.py`
