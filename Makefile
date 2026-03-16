@@ -1,4 +1,4 @@
-.PHONY: guide-sync guide-check issue-dag-list setup lint fmt format test run log today summary smoke
+.PHONY: guide-sync guide-check issue-dag-list setup lint fmt format test run log today summary smoke frontend-check
 
 REPO ?= wakadorimk2/personal-mcp-core
 LIMIT ?= 200
@@ -23,6 +23,9 @@ guide-check:
 issue-dag-list:
 	gh issue list --repo "$(REPO)" --limit "$(LIMIT)" --json number,title,body > "$(ISSUES_JSON)"
 	python scripts/issue_dag.py "$(ISSUES_JSON)" --list $(if $(WITH_TITLE),--list-with-title,) --out "$(OUT)"
+
+frontend-check:
+	@test -f src/personal_mcp/web/app/index.html || (echo "error: frontend build missing. run: pnpm --dir frontend build"; exit 1)
 
 setup:
 	$(PYTHON) -m pip install -e ".[dev]"

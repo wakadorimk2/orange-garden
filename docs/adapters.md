@@ -49,16 +49,16 @@ boundary.
 | Git 管理 | 除外（`.gitignore: src/personal_mcp/web/app/`） |
 | package-data | `pyproject.toml: "web/app/**"` |
 | Vite `base` | `/app/` |
-| `emptyOutDir` | `false`（`true` にすると `web/app/` ごと削除されるため禁止） |
+| `emptyOutDir` | `true`（ビルドごとに outDir 配下をクリアし stale artifact を除去する） |
 
 **`web/app/` は generated artifact** — 以下の制約に注意:
 
-- `pip install` / `pip wheel` 前に必ず `pnpm build` を実行すること
+- `pip wheel` / `python -m build` 前に必ず `pnpm build` を実行すること
 - ビルド未実施のままインストールした場合、`web/app/` はパッケージに含まれない（setuptools は存在しないパスを警告なく無視する）
-- `emptyOutDir: true` は使用禁止
+- `make frontend-check` でビルド成果物の存在を事前確認できる
 
 Python 側で `/app/` を配信する際は `importlib.resources.files("personal_mcp").joinpath("web/app")` を起点として読む。
-`/app/` 配信ロジックの runtime 実装はこの Issue のスコープ外（将来の別 Issue で実装）。
+`/app/` 配信ロジックの runtime 実装はこのドキュメントのスコープ外（将来の別 PR で実装）。
 
 ## Adding a new adapter
 
