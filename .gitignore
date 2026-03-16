@@ -210,3 +210,7 @@ data/events.jsonl
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Frontend (Vite + React)
+frontend/node_modules/
+frontend/dist/
