@@ -8,5 +8,6 @@ export default defineConfig({
   base: "/app/",
   build: {
     outDir: "../src/personal_mcp/web/app",
+    emptyOutDir: false, // true にすると web/app/ ごと削除されるため禁止
   },
 });
