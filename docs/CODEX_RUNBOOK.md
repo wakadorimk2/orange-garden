@@ -2,14 +2,14 @@
 
 この文書は [`docs/RUNBOOK_BASELINE.md`](./RUNBOOK_BASELINE.md) で定義した runtime-specific runbook baseline の exemplar（Codex CLI 用）です。
 
-Codex はこの runbook に従って、`review -> ruff -> pytest -> 最小修正 -> 再実行 -> Draft PR` の順で進む。役割境界の正本は [docs/AI_ROLE_POLICY.md](./AI_ROLE_POLICY.md) とし、この文書は実行手順に絞る。
+Codex はこの runbook に従って、`review -> ruff -> python -m pytest -> 最小修正 -> 再実行 -> Draft PR` の順で進む。役割境界の正本は [docs/AI_ROLE_POLICY.md](./AI_ROLE_POLICY.md) とし、この文書は実行手順に絞る。
 Repo-wide AI entrypoint は [`AGENTS.md`](../AGENTS.md) です。Codex はまず `AGENTS.md` で read order と precedence を確認し、その後この runbook を使います。Issue 着手から handoff までの共通進行管理は [`docs/PLAYBOOK.md`](./PLAYBOOK.md)、runtime 間の dispatch policy は [`docs/WORKER_POLICY.md`](./WORKER_POLICY.md) を正本とし、この文書では再定義しません。
 他の docs 導線は [`docs/README.md`](./README.md) を参照する。
 
 ## Codex がやること
 
 - 既存差分の review
-- `ruff` / `pytest` の実行
+- `ruff` / `python -m pytest` の実行
 - 検証で確認できた失敗に対する最小修正
 - `gh` による Draft PR 作成
 
@@ -160,8 +160,8 @@ ruff format --check .
 
 ```bash
 python --version
-pytest --version
-pytest
+python -m pytest --version
+python -m pytest
 ```
 
 期待結果: 全テスト成功。失敗時は再現手順、失敗箇所、環境差の有無を説明できる。
@@ -230,7 +230,7 @@ git diff
 
 ```bash
 ruff check .
-pytest
+python -m pytest
 ```
 
 期待結果: `ruff` → `pytest` の順で成功する。
@@ -288,7 +288,7 @@ EOF
 - Import / type 失敗: import path、未使用 import、単純な型不整合だけを直す。公開 API や設計変更が要るなら停止。
 - Test 失敗: 失敗テスト名と例外を確認し、最短で再現する。局所修正後は `ruff check .` からやり直す。
 - Flake 疑い: 同じコマンドの再実行は最大 3 回。3 回で収束しなければ flake として記録し、隔離や安定化は別 Issue。
-- 環境差: `python --version`、`ruff --version`、`pytest --version` を残す。OS や依存差が原因なら PR に記載して停止。
+- 環境差: `python --version`、`ruff --version`、`python -m pytest --version` を残す。OS や依存差が原因なら PR に記載して停止。
 - `gh` 失敗: `gh auth status`、`git remote -v`、現在ブランチを確認する。認証や権限の問題は解消せずに状況を報告して止まる。
 
 ## PR Body Template
@@ -305,9 +305,9 @@ EOF
 ## 検証
 - python: `<python --version>`
 - ruff: `<ruff --version>`
-- pytest: `<pytest --version>`
+- pytest: `<python -m pytest --version>`
 - `ruff check .`: `<pass/fail>`
-- `pytest`: `<pass/fail>`
+- `pytest`: `<pass/fail; command: python -m pytest>`
 
 ## レビューノート
 - スコープ:
@@ -382,7 +382,7 @@ Fixed Procedure:
 1. `git status --short --branch`
 2. `git diff --stat`
 3. `ruff check .`
-4. `pytest`
+4. `python -m pytest`
 5. `contract / scope / migration / docs-impl` の 4 観点チェック
 6. Markdown report を出す
 
