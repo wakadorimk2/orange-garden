@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import venv
 import zipfile
 from pathlib import Path
 
@@ -48,6 +49,27 @@ def _build_wheel(
 def _run_egg_info(repo_root: Path, *, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "setup.py", "egg_info"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=check,
+    )
+
+
+def _editable_install(
+    repo_root: Path, venv_dir: Path, *, check: bool = True
+) -> subprocess.CompletedProcess[str]:
+    venv.EnvBuilder(with_pip=True, system_site_packages=True).create(venv_dir)
+    pip_executable = venv_dir / "bin" / "pip"
+    return subprocess.run(
+        [
+            str(pip_executable),
+            "install",
+            "-e",
+            str(repo_root),
+            "--no-deps",
+            "--no-build-isolation",
+        ],
         cwd=repo_root,
         capture_output=True,
         text=True,
@@ -150,5 +172,19 @@ def test_egg_info_allows_metadata_generation_without_frontend_artifact(tmp_path:
     shutil.rmtree(repo_copy / "build", ignore_errors=True)
 
     result = _run_egg_info(repo_copy)
+
+    assert result.returncode == 0
+
+
+def test_editable_install_allows_metadata_generation_without_frontend_artifact(
+    tmp_path: Path,
+) -> None:
+    repo_copy = _copy_repo(tmp_path)
+    venv_dir = tmp_path / "venv"
+
+    shutil.rmtree(repo_copy / "src" / "personal_mcp" / "web" / "app", ignore_errors=True)
+    shutil.rmtree(repo_copy / "build", ignore_errors=True)
+
+    result = _editable_install(repo_copy, venv_dir)
 
     assert result.returncode == 0
