@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os.path
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 from importlib.resources import files
@@ -202,6 +202,6 @@ def _make_handler(data_dir: str):
 
 def serve(host: str = "0.0.0.0", port: int = 8080, data_dir: str = "") -> None:
     handler_cls = _make_handler(data_dir)
-    server = HTTPServer((host, port), handler_cls)
+    server = ThreadingHTTPServer((host, port), handler_cls)
     print(f"serving on http://{host}:{port}  data_dir={data_dir or '(default)'}", flush=True)
     server.serve_forever()

@@ -8,10 +8,11 @@ from __future__ import annotations
 import http.client
 import json
 import threading
+import time
 from unittest.mock import patch
 
 import pytest
-from http.server import HTTPServer
+from http.server import ThreadingHTTPServer
 
 from personal_mcp.adapters import http_server
 from personal_mcp.adapters.http_server import _make_handler, _sanitize_subpath
@@ -64,13 +65,14 @@ def patch_app_root(fake_app_root):
 def server_port(tmp_path_factory, patch_app_root):
     data_dir = str(tmp_path_factory.mktemp("data"))
     handler = _make_handler(data_dir)
-    server = HTTPServer(("127.0.0.1", 0), handler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever)
     t.daemon = True
     t.start()
     yield port
     server.shutdown()
+    server.server_close()
 
 
 def _get(port: int, path: str) -> http.client.HTTPResponse:
@@ -144,7 +146,7 @@ def test_app_missing_asset_returns_404(server_port: int) -> None:
 
 def test_app_503_when_no_build(tmp_path) -> None:
     handler = _make_handler(str(tmp_path))
-    server = HTTPServer(("127.0.0.1", 0), handler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever)
     t.daemon = True
@@ -159,6 +161,56 @@ def test_app_503_when_no_build(tmp_path) -> None:
             assert "pnpm build" in body["hint"]
     finally:
         server.shutdown()
+        server.server_close()
+
+
+def test_threaded_server_serves_health_while_another_request_blocks(tmp_path_factory) -> None:
+    base_handler = _make_handler(str(tmp_path_factory.mktemp("data-threaded")))
+
+    class SlowHandler(base_handler):
+        def do_GET(self) -> None:
+            if self.path == "/slow":
+                time.sleep(0.4)
+            super().do_GET()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), SlowHandler)
+    port = server.server_address[1]
+    t = threading.Thread(target=server.serve_forever)
+    t.daemon = True
+    t.start()
+
+    slow_done = threading.Event()
+
+    def _slow_request() -> None:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            conn.request("GET", "/slow")
+            resp = conn.getresponse()
+            resp.read()
+        finally:
+            conn.close()
+            slow_done.set()
+
+    try:
+        slow_thread = threading.Thread(target=_slow_request)
+        slow_thread.start()
+        time.sleep(0.05)
+
+        started = time.perf_counter()
+        resp = _get(port, "/health")
+        elapsed = time.perf_counter() - started
+        body = json.loads(resp.read())
+
+        assert resp.status == 200
+        assert body == {"status": "ok"}
+        assert elapsed < 0.2
+        assert not slow_done.is_set()
+
+        slow_thread.join(timeout=2)
+        assert slow_done.is_set()
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 # ─── 既存ルートの非回帰 ───────────────────────────────────────────────────────
