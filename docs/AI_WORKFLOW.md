@@ -111,29 +111,76 @@ ops     -> personal-mcp-core-ops
 
 ## 5. AI worker の責務境界
 
-`advisor`:
+副作用の可否判定は常に [`docs/AI_ROLE_POLICY.md`](./AI_ROLE_POLICY.md) を優先する。
+以下の各レーン定義はレーンの作業内容を示すものであり、副作用許可の根拠にはしない。
+
+### 5.1 advisor レーン
+
+責務:
 
 - 調査
 - 論点整理
 - 設計メモ
 - docs 提案
 
-`builder`:
+成果物フォーマット（最小）:
+
+- 論点 / 方針: Markdown 箇条書き、見出しは `##` 以下で統一
+- 設計メモ: 前提・仮定・選択肢の順で記述（推奨を明示するが断定しない）
+- Issue / docs 提案: unified diff またはファイルパスと変更意図
+
+handoff 必須項目:
+
+- 現在の phase と完了済みの作業
+- 参照した docs とファイルパス
+- 未解決の論点または open question
+- 次に見るべき Issue / doc / diff
+
+### 5.2 builder レーン
+
+責務:
 
 - 実装
 - small patch
-- テスト
+- テスト提案
 
-`ops`:
+責務境界:
 
-- issue 作成 / 更新
+- Issue スコープ内の diff 提案に限定する
+- スコープ外変更、設計変更、依存追加は実施せず提案に留める
+- コマンド実行・Git 操作は禁止（`AI_ROLE_POLICY` の no-side-effect 制約に従う）
+
+diff 提案開始条件:
+
+- plan が合意済みで claim が active
+- 変更対象ファイルが特定できている
+
+diff 提案停止条件:
+
+- Issue スコープ逸脱が必要になる
+- 変更対象ファイルまたは前提条件が特定できない
+- ブロッカーが解消しない
+
+### 5.3 ops レーン
+
+責務:
+
+- side-effect を伴う実行・検証
 - PR 整形
 - labels / project 整理
 - runbook / workflow docs 更新
 
-補足:
+Issue / PR / Project 運用:
 
-- 上記は「作業レーン」の責務であり、副作用の可否判定は `AI_ROLE_POLICY` を優先する
+- Issue 系操作は [`docs/AI_ROLE_POLICY.md`](./AI_ROLE_POLICY.md) で許可された範囲に限定する
+- Issue 作成が許可されている場合は `issue-draft` → `issue-split` → `issue-create` の skill フローを使う
+- PR 整形: PR 本文に linked issue・検証結果・残リスクを含める（`CODEX_RUNBOOK.md` PR Body Template 参照）
+- Project 更新: active/ready な Issue にのみ priority を付与する（7 節参照）
+
+レーン間ステータス共有:
+
+- advisor / builder の成果物を受け取るときは claim state と handoff record を確認する
+- ops が作業を渡すときは `handoff_offer` を残し、文面に完了済み・未完了・次アクションを含める
 
 ---
 

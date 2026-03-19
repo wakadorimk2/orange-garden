@@ -88,35 +88,50 @@ adapter module. The only runtime adapters shipped today are MCP and HTTP.
 ## Skills layer
 
 Skills define how AI agents interact with this repository.
-Most AI-agnostic definitions live in `docs/skills/`, while high-frequency
-execution skills for Codex are folded into `docs/CODEX_RUNBOOK.md`.
-AI-specific adapters reference the appropriate canonical source.
+AI-agnostic canonical definitions live in `docs/skills/`.
+Execution details tied to a specific runtime are in runtime runbooks (`docs/CODEX_RUNBOOK.md`).
+Adapters in `.claude/skills/` and `.codex/skills/` reference the appropriate canonical source.
 
 ```
-docs/skills/                          ← Standalone canonical skill definitions
+docs/skills/                          ← AI-agnostic canonical skill definitions
 ├── clarify-request.md
 ├── codex-claude-bridge.md
 ├── implement-only.md
+├── issue-draft.md
+├── issue-split.md
+├── post-candidate.md
 ├── research-propose-structured.md
-└── issue-split.md
+├── review-diff.md
+└── review-preflight.md
 
-docs/CODEX_RUNBOOK.md                 ← Runbook-backed operational skill canon
-├── review-diff
-├── review-preflight
-├── minimal-safe-impl
-├── issue-create
-└── issue-project-meta
+docs/CODEX_RUNBOOK.md                 ← Codex execution detail (Appendix A/B/C/D/E)
+├── review-diff      (Appendix A)
+├── review-preflight (Appendix B)
+├── minimal-safe-impl (Appendix C)
+├── issue-create     (Appendix D)
+└── issue-project-meta (Appendix E)
 
 .claude/skills/                       ← Claude Code adapters
 ├── clarify-request/SKILL.md
+├── issue-create/SKILL.md
+├── issue-draft/SKILL.md
+├── issue-project-meta/SKILL.md
+├── issue-split/SKILL.md
 ├── minimal-safe-impl/SKILL.md
-└── research-propose-structured/SKILL.md
+├── research-propose-structured/SKILL.md
+└── review-preflight/SKILL.md
 
 .codex/skills/                        ← Codex adapters
 ├── clarify-request/SKILL.md
 ├── codex-claude-bridge/SKILL.md
+├── issue-create/SKILL.md
+├── issue-draft/SKILL.md
+├── issue-project-meta/SKILL.md
+├── issue-split/SKILL.md
 ├── minimal-safe-impl/SKILL.md
+├── post-candidate/SKILL.md
 ├── research-propose-structured/SKILL.md
+├── review-diff/SKILL.md
 └── review-preflight/SKILL.md
 ```
 
@@ -124,16 +139,26 @@ docs/CODEX_RUNBOOK.md                 ← Runbook-backed operational skill canon
 |---|---|---|
 | clarify | `docs/skills/clarify-request.md` | `.claude/skills/clarify-request/`, `.codex/skills/clarify-request/` |
 | bridge | `docs/skills/codex-claude-bridge.md` | `.codex/skills/codex-claude-bridge/` |
-| impl | `docs/skills/implement-only.md` | no Codex adapter; Claude-oriented canonical doc |
+| impl | `docs/skills/implement-only.md` | なし（Claude-oriented canonical doc; no adapter） |
 | impl | `docs/CODEX_RUNBOOK.md` | `.claude/skills/minimal-safe-impl/`, `.codex/skills/minimal-safe-impl/` |
 | research | `docs/skills/research-propose-structured.md` | `.claude/skills/research-propose-structured/`, `.codex/skills/research-propose-structured/` |
-| review | `docs/CODEX_RUNBOOK.md` | `.codex/skills/review-diff/`, `.codex/skills/review-preflight/`, `.claude/skills/review-preflight/` |
-| issue ops | `docs/CODEX_RUNBOOK.md` | `.codex/skills/issue-create/`, `.codex/skills/issue-project-meta/`, `.claude/skills/issue-create/`, `.claude/skills/issue-project-meta/` |
+| issue-draft | `docs/skills/issue-draft.md` | `.claude/skills/issue-draft/`, `.codex/skills/issue-draft/` |
+| issue-split | `docs/skills/issue-split.md` | `.claude/skills/issue-split/`, `.codex/skills/issue-split/` |
+| post-candidate | `docs/skills/post-candidate.md` | `.codex/skills/post-candidate/` |
+| review-diff | `docs/skills/review-diff.md` | `.codex/skills/review-diff/` |
+| review-preflight | `docs/skills/review-preflight.md` | `.codex/skills/review-preflight/`, `.claude/skills/review-preflight/` |
+| issue-ops | `docs/CODEX_RUNBOOK.md` | `.codex/skills/issue-create/`, `.codex/skills/issue-project-meta/`, `.claude/skills/issue-create/`, `.claude/skills/issue-project-meta/` |
 
-**Rule**: canonical docs stay tool-agnostic where possible. When a skill is
-effectively a fixed part of the Codex execution flow, `docs/CODEX_RUNBOOK.md`
-acts as the canonical source and adapters keep only invocation syntax and
+**Rule**: canonical docs stay tool-agnostic where possible. Runtime execution
+details for a specific workflow belong in the runtime runbook rather than in
+the canonical skill doc. Adapters keep only invocation syntax and
 runtime-specific constraints.
+
+**Thick adapter note**: the `review-diff` and `review-preflight` adapters currently
+contain full skill definitions rather than only invocation syntax. This predates
+the `docs/skills/` canonical docs above and is a recognized exception. The canonical
+source is now `docs/skills/review-diff.md` and `docs/skills/review-preflight.md`.
+Adapter thinning is deferred as a follow-up task.
 
 ---
 
