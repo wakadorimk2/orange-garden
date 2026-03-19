@@ -33,14 +33,26 @@ function newDashboardFlowId() {
   return `dashboard-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function candidateRenderKey(candidate: Candidate) {
+  return `${candidate.source ?? ""}\u0000${candidate.text}`;
+}
+
+function savedCandidateKey(candidate: Candidate) {
+  return candidate.text.trim();
+}
+
 export default function QuickLog() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>({ text: "", type: "" });
+  const [savedTagKey, setSavedTagKey] = useState<string | null>(null); // #427
+  const [textOpen, setTextOpen] = useState(false); // #428
   const textRef = useRef<HTMLTextAreaElement>(null);
   const textFlowRef = useRef<DashboardFlow | null>(null);
   const clearMsgTimeoutRef = useRef<number | null>(null);
+  const savedTagTimeoutRef = useRef<number | null>(null); // #427
+  const savedTagFrameRef = useRef<number | null>(null); // #427
   const savingRef = useRef(false);
 
   useEffect(() => {
@@ -50,8 +62,21 @@ export default function QuickLog() {
       if (clearMsgTimeoutRef.current !== null) {
         window.clearTimeout(clearMsgTimeoutRef.current);
       }
+      if (savedTagTimeoutRef.current !== null) {
+        window.clearTimeout(savedTagTimeoutRef.current);
+      }
+      if (savedTagFrameRef.current !== null) {
+        window.cancelAnimationFrame(savedTagFrameRef.current);
+      }
     };
   }, []);
+
+  // #428: auto-focus textarea when opened
+  useEffect(() => {
+    if (textOpen && textRef.current) {
+      textRef.current.focus();
+    }
+  }, [textOpen]);
 
   async function loadCandidates() {
     try {
@@ -141,10 +166,40 @@ export default function QuickLog() {
     }, 3000);
   }
 
+  function scheduleSavedTagClear() {
+    if (savedTagTimeoutRef.current !== null) {
+      window.clearTimeout(savedTagTimeoutRef.current);
+    }
+    savedTagTimeoutRef.current = window.setTimeout(() => {
+      setSavedTagKey(null);
+      savedTagTimeoutRef.current = null;
+    }, 600);
+  }
+
+  function triggerSavedTagFeedback(nextSavedTagKey: string) {
+    if (savedTagFrameRef.current !== null) {
+      window.cancelAnimationFrame(savedTagFrameRef.current);
+      savedTagFrameRef.current = null;
+    }
+
+    if (savedTagKey === nextSavedTagKey) {
+      setSavedTagKey(null);
+      savedTagFrameRef.current = window.requestAnimationFrame(() => {
+        setSavedTagKey(nextSavedTagKey);
+        savedTagFrameRef.current = null;
+        scheduleSavedTagClear();
+      });
+      return;
+    }
+
+    setSavedTagKey(nextSavedTagKey);
+    scheduleSavedTagClear();
+  }
+
   async function saveLogText(
     text: string,
     flow: DashboardFlow,
-    options?: { clearDraftOnSuccess?: boolean }
+    options?: { clearDraftOnSuccess?: boolean; savedCandidateKey?: string }
   ) {
     const trimmed = text.trim();
     if (!trimmed || !beginSave()) return false;
@@ -166,12 +221,18 @@ export default function QuickLog() {
       });
 
       if (r.ok) {
-        const saved = await r.json();
+        await r.json();
         if (options?.clearDraftOnSuccess ?? true) {
           setDraft("");
           resetTextFlow();
         }
-        setMsg({ text: `保存しました: ${saved.domain} / ${saved.kind}`, type: "ok" });
+        setMsg({ text: "保存しました", type: "ok" }); // #427: simplified
+
+        // #427: saved tag visual feedback
+        if (options?.savedCandidateKey) {
+          triggerSavedTagFeedback(options.savedCandidateKey);
+        }
+
         void postUiEvent("input_submitted", telemetryData);
         void postUiEvent("save_success", telemetryData);
         await loadCandidates();
@@ -204,7 +265,11 @@ export default function QuickLog() {
     if (!trimmed || savingRef.current) return;
     const flow = startTextFlowIfNeeded(trimmed);
     if (!flow) return;
-    await saveLogText(trimmed, flow, { clearDraftOnSuccess: true });
+    const ok = await saveLogText(trimmed, flow, { clearDraftOnSuccess: true });
+    if (ok) {
+      textRef.current?.blur(); // #427: auto blur after text save
+      setTextOpen(false); // #428: collapse after save
+    }
   }
 
   async function handleCandidateTap(candidate: Candidate) {
@@ -225,7 +290,10 @@ export default function QuickLog() {
       candidate_source: flow.candidateSource,
       text_length: candidate.text.trim().length,
     });
-    await saveLogText(candidate.text, flow, { clearDraftOnSuccess: false });
+    await saveLogText(candidate.text, flow, {
+      clearDraftOnSuccess: false,
+      savedCandidateKey: savedCandidateKey(candidate),
+    });
   }
 
   function handleDraftFocus() {
@@ -247,54 +315,74 @@ export default function QuickLog() {
     }
   }
 
+  // #428: collapse when textarea loses focus with no content
+  function handleDraftBlur() {
+    if (!draft.trim() && !busy) {
+      setTextOpen(false);
+    }
+  }
+
   const trimmed = draft.trim();
   const draftLabel = trimmed.length <= 18 ? trimmed : trimmed.slice(0, 18) + "...";
 
   return (
     <>
-      <div className="quicklog-intro">
-        候補タグをタップするとそのまま保存されます。自由入力は下の欄から追加できます。
-      </div>
+      {/* #426: section wrapper; hidden when no candidates */}
       {candidates.length > 0 && (
-        <div className="candidates">
-          {candidates.map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              className="candidate-tag"
-              disabled={busy}
-              onClick={() => void handleCandidateTap(c)}
-            >
-              {c.text}
-            </button>
-          ))}
-        </div>
+        <section aria-label="候補" className="candidate-section">
+          <div className="quicklog-intro">
+            候補タグをタップするとそのまま保存されます。自由入力は下の欄から追加できます。
+          </div>
+          <div className="candidates">
+            {candidates.map((c) => (
+              <button
+                key={candidateRenderKey(c)}
+                type="button"
+                className={`candidate-tag${savedTagKey === savedCandidateKey(c) ? " saved" : ""}`}
+                disabled={busy}
+                onClick={() => void handleCandidateTap(c)}
+              >
+                {c.text}
+              </button>
+            ))}
+          </div>
+        </section>
       )}
       <div className="log-form">
-        <textarea
-          ref={textRef}
-          className="log-text"
-          value={draft}
-          onChange={(e) => handleDraftChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={handleDraftFocus}
-          placeholder="いま起きたことを短く記録"
-          enterKeyHint="done"
-          disabled={busy}
-        />
-        <div className="composer-meta">
-          <div className="draft-preview" aria-live="polite">
-            {trimmed ? "保存対象: " + trimmed : "候補をタップするか短文を入力"}
-          </div>
-          <button
-            type="button"
-            className="log-submit"
-            disabled={!trimmed || busy}
-            onClick={handleSubmit}
-          >
-            {busy ? "保存中..." : trimmed ? `「${draftLabel}」を保存` : "保存"}
+        {/* #428: on-demand text input */}
+        {!textOpen ? (
+          <button type="button" className="open-text-btn" onClick={() => setTextOpen(true)}>
+            + テキスト入力
           </button>
-        </div>
+        ) : (
+          <>
+            <textarea
+              ref={textRef}
+              className="log-text"
+              value={draft}
+              onChange={(e) => handleDraftChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={handleDraftFocus}
+              onBlur={handleDraftBlur}
+              placeholder="いま起きたことを短く記録"
+              enterKeyHint="done"
+              disabled={busy}
+            />
+            <div className="composer-meta">
+              <div className="draft-preview" aria-live="polite">
+                {trimmed ? "保存対象: " + trimmed : "候補をタップするか短文を入力"}
+              </div>
+              <button
+                type="button"
+                className="log-submit"
+                disabled={!trimmed || busy}
+                onClick={handleSubmit}
+              >
+                {busy ? "保存中..." : trimmed ? `「${draftLabel}」を保存` : "保存"}
+              </button>
+            </div>
+          </>
+        )}
         <div
           className={`log-msg${msg.type === "ok" ? " msg-ok" : msg.type === "err" ? " msg-err" : ""}`}
           aria-live="polite"
