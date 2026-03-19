@@ -32,7 +32,7 @@ shipped_density[date] = count(events WHERE
 
 This is the current `display_population`.
 
-Operationally, `/api/heatmap` returns the last local 28 days, including zero-value days, as:
+Operationally, `/api/heatmap` returns the last local 42 days, including zero-value days, as:
 
 ```json
 [{ "date": "YYYY-MM-DD", "count": N }]
