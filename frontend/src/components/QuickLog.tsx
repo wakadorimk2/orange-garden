@@ -39,8 +39,9 @@ export default function QuickLog() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>({ text: "", type: "" });
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const dashboardFlowRef = useRef<DashboardFlow | null>(null);
+  const textFlowRef = useRef<DashboardFlow | null>(null);
   const clearMsgTimeoutRef = useRef<number | null>(null);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     loadCandidates();
@@ -86,8 +87,8 @@ export default function QuickLog() {
     return "";
   }
 
-  async function startTextFlowIfNeeded(text: string) {
-    if (dashboardFlowRef.current?.mode === "text") return dashboardFlowRef.current;
+  function startTextFlowIfNeeded(text: string) {
+    if (textFlowRef.current) return textFlowRef.current;
 
     const flow: DashboardFlow = {
       flowId: newDashboardFlowId(),
@@ -96,8 +97,8 @@ export default function QuickLog() {
       candidateSource: "free_text",
       editedBeforeSubmit: false,
     };
-    dashboardFlowRef.current = flow;
-    await postUiEvent("input_started", {
+    textFlowRef.current = flow;
+    void postUiEvent("input_started", {
       flow_id: flow.flowId,
       mode: flow.mode,
       trigger: flow.trigger,
@@ -107,8 +108,27 @@ export default function QuickLog() {
     return flow;
   }
 
-  function resetDashboardFlow() {
-    dashboardFlowRef.current = null;
+  function resetTextFlow() {
+    textFlowRef.current = null;
+  }
+
+  function beginSave() {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+
+    if (clearMsgTimeoutRef.current !== null) {
+      window.clearTimeout(clearMsgTimeoutRef.current);
+      clearMsgTimeoutRef.current = null;
+    }
+
+    setBusy(true);
+    setMsg({ text: "", type: "" });
+    return true;
+  }
+
+  function endSave() {
+    savingRef.current = false;
+    setBusy(false);
   }
 
   function scheduleMessageClear() {
@@ -121,17 +141,13 @@ export default function QuickLog() {
     }, 3000);
   }
 
-  async function saveLogText(text: string, flow: DashboardFlow) {
+  async function saveLogText(
+    text: string,
+    flow: DashboardFlow,
+    options?: { clearDraftOnSuccess?: boolean }
+  ) {
     const trimmed = text.trim();
-    if (!trimmed || busy) return false;
-
-    if (clearMsgTimeoutRef.current !== null) {
-      window.clearTimeout(clearMsgTimeoutRef.current);
-      clearMsgTimeoutRef.current = null;
-    }
-
-    setBusy(true);
-    setMsg({ text: "", type: "" });
+    if (!trimmed || !beginSave()) return false;
 
     const telemetryData: UiEventExtraData = {
       flow_id: flow.flowId,
@@ -151,12 +167,14 @@ export default function QuickLog() {
 
       if (r.ok) {
         const saved = await r.json();
-        setDraft("");
+        if (options?.clearDraftOnSuccess ?? true) {
+          setDraft("");
+          resetTextFlow();
+        }
         setMsg({ text: `保存しました: ${saved.domain} / ${saved.kind}`, type: "ok" });
-        await postUiEvent("input_submitted", telemetryData);
-        await postUiEvent("save_success", telemetryData);
+        void postUiEvent("input_submitted", telemetryData);
+        void postUiEvent("save_success", telemetryData);
         await loadCandidates();
-        resetDashboardFlow();
         scheduleMessageClear();
         return true;
       }
@@ -169,27 +187,28 @@ export default function QuickLog() {
         // Keep the HTTP status fallback when the error body is not JSON.
       }
       setMsg({ text: "エラー: " + errorMessage, type: "err" });
-      await postUiEvent("save_error", { ...telemetryData, status: r.status });
+      void postUiEvent("save_error", { ...telemetryData, status: r.status });
       return false;
     } catch (ex: unknown) {
       const message = ex instanceof Error ? ex.message : String(ex);
       setMsg({ text: "接続エラー: " + message, type: "err" });
-      await postUiEvent("save_error", { ...telemetryData, reason: "fetch_exception" });
+      void postUiEvent("save_error", { ...telemetryData, reason: "fetch_exception" });
       return false;
     } finally {
-      setBusy(false);
+      endSave();
     }
   }
 
   async function handleSubmit() {
     const trimmed = draft.trim();
-    if (!trimmed || busy) return;
-    const flow = await startTextFlowIfNeeded(trimmed);
-    await saveLogText(trimmed, flow);
+    if (!trimmed || savingRef.current) return;
+    const flow = startTextFlowIfNeeded(trimmed);
+    if (!flow) return;
+    await saveLogText(trimmed, flow, { clearDraftOnSuccess: true });
   }
 
   async function handleCandidateTap(candidate: Candidate) {
-    if (busy) return;
+    if (savingRef.current) return;
 
     const flow: DashboardFlow = {
       flowId: newDashboardFlowId(),
@@ -199,24 +218,26 @@ export default function QuickLog() {
       editedBeforeSubmit: false,
     };
 
-    dashboardFlowRef.current = flow;
-    await postUiEvent("input_started", {
+    void postUiEvent("input_started", {
       flow_id: flow.flowId,
       mode: flow.mode,
       trigger: flow.trigger,
       candidate_source: flow.candidateSource,
       text_length: candidate.text.trim().length,
     });
-    await saveLogText(candidate.text, flow);
+    await saveLogText(candidate.text, flow, { clearDraftOnSuccess: false });
   }
 
-  async function handleDraftFocus() {
-    await startTextFlowIfNeeded(draft.trim());
+  function handleDraftFocus() {
+    startTextFlowIfNeeded(draft.trim());
   }
 
-  async function handleDraftChange(nextDraft: string) {
+  function handleDraftChange(nextDraft: string) {
     setDraft(nextDraft);
-    await startTextFlowIfNeeded(nextDraft.trim());
+    const flow = startTextFlowIfNeeded(nextDraft.trim());
+    if (flow) {
+      flow.editedBeforeSubmit = true;
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -254,9 +275,9 @@ export default function QuickLog() {
           ref={textRef}
           className="log-text"
           value={draft}
-          onChange={(e) => void handleDraftChange(e.target.value)}
+          onChange={(e) => handleDraftChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => void handleDraftFocus()}
+          onFocus={handleDraftFocus}
           placeholder="いま起きたことを短く記録"
           enterKeyHint="done"
           disabled={busy}
