@@ -11,11 +11,16 @@ SOURCE="${NOTIFY_SOURCE:-}"
 SEVERITY="${NOTIFY_SEVERITY:-}"
 VERBOSITY="${NOTIFY_VERBOSITY:-}"
 READ_STDIN="0"
+DRY_RUN="0"
 CHANNEL_ARG_SET="0"
 EVENT_ARG_SET="0"
 ADAPTER_CHANNEL=""
 DISCORD_WEBHOOK_ENV_NAME=""
 DISCORD_WEBHOOK_SECRET_FILE=""
+
+if [[ "${NOTIFY_ENABLED:-1}" == "0" ]]; then
+  exit 0
+fi
 
 notification_kind_event() {
   case "$1" in
@@ -143,9 +148,28 @@ resolve_notification_route() {
   esac
 }
 
+apply_title_prefix() {
+  local env_prefix=""
+  local exec_prefix=""
+  case "${NOTIFY_ENV:-}" in
+    dev)  env_prefix="[DEV]" ;;
+    prod) env_prefix="[PROD]" ;;
+    "")   return ;;
+  esac
+  case "${SOURCE:-}" in
+    claude_code) exec_prefix="[claude]" ;;
+    codex*)      exec_prefix="[codex]" ;;
+  esac
+  if [[ -n "$TITLE" ]]; then
+    TITLE="${env_prefix}${exec_prefix} ${TITLE}"
+  else
+    TITLE="${env_prefix}${exec_prefix}"
+  fi
+}
+
 usage() {
   cat <<'EOF'
-usage: notify [--channel NAME] [--title TEXT] [--event NAME] [--kind NAME] [--source NAME] [--stdin] MESSAGE
+usage: notify [--channel NAME] [--title TEXT] [--event NAME] [--kind NAME] [--source NAME] [--stdin] [--dry-run] MESSAGE
 
 Common notification wrapper for CLI tools.
 
@@ -183,6 +207,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --stdin)
       READ_STDIN="1"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="1"
       shift
       ;;
     -h|--help)
@@ -260,6 +288,14 @@ if [[ -z "$MESSAGE" ]]; then
 fi
 
 resolve_notification_route "$CHANNEL"
+
+apply_title_prefix
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  printf '[dry-run] channel=%s\nevent=%s\ntitle=%s\nsource=%s\nseverity=%s\nverbosity=%s\n---\n%s\n' \
+    "$CHANNEL" "$EVENT" "$TITLE" "$SOURCE" "$SEVERITY" "$VERBOSITY" "$MESSAGE"
+  exit 0
+fi
 
 ADAPTER_PATH="$CHANNEL_DIR/$ADAPTER_CHANNEL"
 if [[ ! -f "$ADAPTER_PATH" ]]; then
