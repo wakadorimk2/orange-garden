@@ -207,6 +207,42 @@ Notes:
 - `data/` is for development, tests, and samples
 - the runtime is local-first; external notification delivery is opt-in
 
+### Frontend development (additional steps)
+
+The above covers the Python-first normal workflow. If you are working on the React UI under `/app/`, the following additional steps apply.
+
+**Dev (HMR):**
+
+```bash
+pnpm --dir frontend install
+pnpm --dir frontend dev   # Vite dev server with HMR; access via Vite port directly
+```
+
+**Build and serve via Python:**
+
+```bash
+pnpm --dir frontend build  # outputs to src/personal_mcp/web/app/
+make run                   # Python server serves /app/ from the built artifacts
+```
+
+Build artifacts go to `src/personal_mcp/web/app/` (configured in `frontend/vite.config.ts`).
+They are excluded from Git and must be rebuilt before packaging.
+See [docs/adapters.md](./docs/adapters.md) for the full build artifact contract.
+
+**Missing-build behavior:**
+
+| Context | Behavior |
+|---------|----------|
+| `make run` → `/app/` | 503 with hint to run `pnpm build` |
+| `pip wheel` / `pip install .` | build error with hint to run `pnpm build` first |
+| `make frontend-check` | exits non-zero if `src/personal_mcp/web/app/index.html` is absent |
+
+Recovery: run `pnpm --dir frontend build`, then retry.
+
+**CI:**
+
+The `frontend-build` job in `.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile` and `pnpm build` on every push and pull request. It verifies that the build completes without error; it does not package or deploy artifacts.
+
 ## Useful Documentation
 
 Start here if you want the current source of truth for specific areas:
@@ -223,6 +259,7 @@ Start here if you want the current source of truth for specific areas:
 | [docs/worker-registry-coordination.md](./docs/worker-registry-coordination.md) | Registry と GitHub の orchestration 境界 |
 | [docs/infra/notify-wrapper.md](./docs/infra/notify-wrapper.md) | Notification wrapper and channel behavior |
 | [docs/domain-extension-policy.md](./docs/domain-extension-policy.md) | Rules for adding new domains |
+| [docs/adapters.md](./docs/adapters.md) | Frontend build artifact contract and adapter registry |
 
 ## Future Directions
 
