@@ -80,6 +80,7 @@ pnpm --dir frontend dev
 **Build and serve via Python:**
 
 ```bash
+pnpm --dir frontend install
 pnpm --dir frontend build
 make run
 ```

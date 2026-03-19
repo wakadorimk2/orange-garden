@@ -221,6 +221,7 @@ pnpm --dir frontend dev   # Vite dev server with HMR; access via Vite port direc
 **Build and serve via Python:**
 
 ```bash
+pnpm --dir frontend install
 pnpm --dir frontend build  # outputs to src/personal_mcp/web/app/
 make run                   # Python server serves /app/ from the built artifacts
 ```
