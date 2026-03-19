@@ -15,6 +15,11 @@ body {
   padding: 1rem;
 }
 
+/* #426: candidate section wrapper */
+.candidate-section {
+  margin-bottom: 0.25rem;
+}
+
 .quicklog-intro {
   margin-bottom: 0.75rem;
   font-size: 0.95rem;
@@ -49,6 +54,17 @@ body {
   cursor: default;
 }
 
+/* #427: saved tag flash animation */
+@keyframes tag-saved {
+  0%   { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+  70%  { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+  100% { background: #fff7e8; border-color: #e0a244; color: #7c3f00; }
+}
+
+.candidate-tag.saved {
+  animation: tag-saved 0.6s ease-out forwards;
+}
+
 /* sticky composer */
 .log-form {
   position: sticky;
@@ -58,6 +74,23 @@ body {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), #ffffff 28%);
   border-top: 1px solid #eee;
   box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.05);
+}
+
+/* #428: on-demand text input toggle button */
+.open-text-btn {
+  width: 100%;
+  padding: 0.6rem;
+  font-size: 0.95rem;
+  color: #666;
+  background: transparent;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.open-text-btn:active {
+  background: #f5f5f5;
 }
 
 .log-text {
