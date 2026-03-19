@@ -173,7 +173,7 @@ diff 提案停止条件:
 Issue / PR / Project 運用:
 
 - Issue 系操作は [`docs/AI_ROLE_POLICY.md`](./AI_ROLE_POLICY.md) で許可された範囲に限定する
-- Issue 作成が許可されている場合は `issue-draft` → `issue-split` → `issue-create` の skill フローを使う
+- Issue 作成が許可されている場合は `issue-draft` → `issue-create` を基本フローとし、分割が必要と人間が判断した場合のみ `issue-split` を挟む
 - PR 整形: PR 本文に linked issue・検証結果・残リスクを含める（`CODEX_RUNBOOK.md` PR Body Template 参照）
 - Project 更新: active/ready な Issue にのみ priority を付与する（7 節参照）
 
