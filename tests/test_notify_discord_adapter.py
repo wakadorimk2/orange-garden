@@ -231,7 +231,7 @@ def test_notify_discord_channel_uses_dev_webhook_when_notify_env_is_dev(tmp_path
     args, payload = _load_payload(args_file)
     assert args[-1] == "https://discord.example/dev-webhook"
     assert payload == {
-        "content": "hello\n[`generic`]",
+        "content": "**[DEV]**\nhello\n[`generic`]",
     }
 
 
@@ -262,7 +262,7 @@ def test_notify_discord_channel_uses_prod_secret_file_when_notify_env_is_prod(
     args, payload = _load_payload(args_file)
     assert args[-1] == "https://discord.example/prod-from-file"
     assert payload == {
-        "content": "hello\n[`generic`]",
+        "content": "**[PROD]**\nhello\n[`generic`]",
     }
 
 

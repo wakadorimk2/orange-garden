@@ -275,3 +275,40 @@ def test_notify_errors_for_unknown_channel() -> None:
     result = _run_notify("--channel", "missing", "hello", check=False)
     assert result.returncode == 2
     assert "channel adapter not found" in result.stderr
+
+
+def test_notify_enabled_zero_skips_normal_delivery() -> None:
+    result = _run_notify("hello", env={"NOTIFY_ENABLED": "0"})
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+def test_notify_enabled_zero_still_allows_dry_run() -> None:
+    result = _run_notify(
+        "--dry-run",
+        "--kind",
+        "ai_task_completed",
+        "--title",
+        "Claude Code",
+        "hello",
+        env={"NOTIFY_ENABLED": "0"},
+    )
+    assert result.returncode == 0
+    assert result.stdout == (
+        "[dry-run] channel=stdout\n"
+        "event=task_completed\n"
+        "title=Claude Code\n"
+        "source=\n"
+        "severity=info\n"
+        "verbosity=normal\n"
+        "---\n"
+        "hello\n"
+    )
+    assert result.stderr == ""
+
+
+def test_notify_enabled_zero_does_not_bypass_validation_errors() -> None:
+    result = _run_notify("--stdin", "hello", env={"NOTIFY_ENABLED": "0"}, check=False)
+    assert result.returncode == 2
+    assert "cannot be combined with MESSAGE arguments" in result.stderr

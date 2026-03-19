@@ -48,6 +48,105 @@ Default mapping:
 たとえば `--kind smoke_test` は event としては `task_completed` だが、policy は
 通常完了通知ではなく `info/debug` として扱う。
 
+## Global notification toggle (NOTIFY_ENABLED)
+
+`NOTIFY_ENABLED=0` を設定すると、`scripts/notify` は通常の通知送信を行わず `exit 0` する。
+アダプターは呼ばれない。デフォルト値は `1`(通知有効)。ただし `--dry-run` は例外で、
+通知無効環境でも payload 確認のために実行できる。
+
+```bash
+# 通知を一時的に無効化する
+NOTIFY_ENABLED=0 scripts/notify --kind ai_task_completed "test"
+# → 出力なし、exit 0
+```
+
+用途の例:
+
+- ローカル開発中に Discord 通知をまとめて止めたい場合
+- CI やテスト実行時に副作用を排除したい場合
+
+shell startup file への設定例:
+
+```bash
+# ~/.bashrc または ~/.zshrc
+export NOTIFY_ENABLED=0  # 開発マシンでは無効
+```
+
+## Dry-run mode
+
+`--dry-run` を渡すと、Discord などのアダプターを呼ばずに payload を stdout へ出力して終了する。
+`NOTIFY_ENABLED=0` と併用しても、メッセージ解決・ルーティング・prefix 付与はそのまま実行される。
+
+```bash
+# Discord を呼ばずに payload を確認
+NOTIFY_CHANNEL=discord scripts/notify --dry-run --kind ai_task_completed --title "Claude Code" "task done"
+```
+
+出力フォーマット:
+
+```text
+[dry-run] channel=discord
+event=task_completed
+title=Claude Code
+source=
+severity=info
+verbosity=normal
+---
+task done
+```
+
+`NOTIFY_ENV` と `--source` を組み合わせた場合は prefix が付与された状態で出力される:
+
+```bash
+NOTIFY_CHANNEL=discord NOTIFY_ENV=dev \
+  scripts/notify --dry-run --kind ai_task_completed \
+  --title "Claude Code" --source claude_code "task done"
+```
+
+```text
+[dry-run] channel=discord
+event=task_completed
+title=[DEV][claude] Claude Code
+source=claude_code
+severity=info
+verbosity=normal
+---
+task done
+```
+
+## Title prefix ([DEV]/[PROD] and executor tag)
+
+`NOTIFY_ENV` が設定されている場合、adapter 呼び出し前に `NOTIFY_TITLE` へプレフィックスが付与される。
+
+| `NOTIFY_ENV` | env prefix | note |
+|---|---|---|
+| `dev` | `[DEV]` | dev 環境向け通知 |
+| `prod` | `[PROD]` | prod 環境向け通知 |
+| 未設定 | なし | 変更なし（後方互換） |
+
+`NOTIFY_ENV` が設定されている場合、`--source` の値から executor タグも付与される:
+
+| `--source` / `NOTIFY_SOURCE` | executor prefix |
+|---|---|
+| `claude_code` | `[claude]` |
+| `codex` / `codex-tui` など (`codex*`) | `[codex]` |
+| その他 / 未設定 | なし |
+
+結果例:
+
+```text
+NOTIFY_ENV=dev, source=claude_code, title="Claude Code"
+  → [DEV][claude] Claude Code
+
+NOTIFY_ENV=prod, source=codex-tui, title="issue #286 完了"
+  → [PROD][codex] issue #286 完了
+
+NOTIFY_ENV 未設定
+  → タイトル変更なし（NOTIFY_SOURCE の値に関わらず）
+```
+
+`NOTIFY_ENV` が未設定の場合はプレフィックスは一切付与されない。これは既存の呼び出しへの後方互換保証。
+
 ## Discord webhook channel
 
 Set `NOTIFY_CHANNEL=discord` or pass `--channel discord`, then provide a
@@ -204,6 +303,38 @@ Exit semantics:
 - notification delivery failures do not overwrite that exit code
 - diagnose delivery problems from stderr, especially the line before
   `claude-notify: notify delivery failed`
+
+### Standard launch setup for Claude Code
+
+`scripts/claude-notify` を通常起動の標準コマンドとして使う。
+`bare claude`(wrapper なし)の直接起動は、通知が不要な場合に限る。
+
+shell profile / alias への設定例:
+
+```bash
+# ~/.bashrc または ~/.zshrc
+export NOTIFY_CHANNEL=discord
+export NOTIFY_ENV=dev  # または prod
+# DISCORD_WEBHOOK_AI_STATUS_DEV は ~/.config/secrets/discord_webhook_dev.env に置く
+
+alias claude-dev="NOTIFY_ENV=dev /path/to/og-notify/scripts/claude-notify"
+```
+
+日常的な起動パターン:
+
+```bash
+# 通知付き起動（標準）
+scripts/claude-notify --print "issue #291 の実装"
+
+# 通知なしで一時的に実行する場合（bare claude）
+claude --print "軽い確認のみ"
+```
+
+`bare claude` を使う例外ケース:
+
+- 単純な質問や確認のみで Task が完了しない場合
+- `NOTIFY_ENABLED=0` を設定して明示的に通知を止めている環境
+- CI やスクリプトの中で呼び出し元が通知を管理する場合
 
 ### Local verification without a real Discord webhook
 
@@ -470,6 +601,54 @@ logical `discord`, the wrapper selects `DISCORD_WEBHOOK_AI_STATUS_DEV` or
 `DISCORD_WEBHOOK_AI_STATUS_PROD`. `--smoke-test` still uses kind routing and
 lands on `discord-test`.
 
+### Standard launch setup for Codex
+
+Codex を通知付きで起動する標準パターン。`NOTIFY_CHANNEL` と webhook 設定を
+shell startup file または wrapper script に置くことで、毎回 export を省略できる。
+
+shell startup file への設定例:
+
+```bash
+# ~/.bashrc または ~/.zshrc
+export NOTIFY_CHANNEL=discord
+export NOTIFY_ENV=dev  # または prod
+# webhook secret は ~/.config/secrets/discord_webhook_dev.env に分離して置く
+```
+
+`~/.codex/config.toml` への `notify` 設定(必須):
+
+```toml
+notify = ["python3", "/absolute/path/to/og-notify/scripts/codex_notify.py"]
+```
+
+環境変数の設定場所まとめ:
+
+| 変数 | 推奨設置場所 |
+|---|---|
+| `NOTIFY_CHANNEL=discord` | shell startup file または wrapper script |
+| `NOTIFY_ENV=dev\|prod` | shell startup file または wrapper script |
+| `DISCORD_WEBHOOK_AI_STATUS` | `~/.config/secrets/discord_webhook.env` |
+| `DISCORD_WEBHOOK_AI_STATUS_DEV` | `~/.config/secrets/discord_webhook_dev.env` |
+| `DISCORD_WEBHOOK_AI_STATUS_PROD` | `~/.config/secrets/discord_webhook_prod.env` |
+| `DISCORD_WEBHOOK_AI_STATUS_TEST` | smoke-test 時のみ export または `~/.config/secrets/discord_test_webhook.env` |
+
+WSL 環境の場合は、`codex` と `python3` が実際に動く WSL 側の環境に設定すること。
+
+設定後の検証手順:
+
+```bash
+# 1. stdout channel でブリッジ動作を確認（Discord に送信しない）
+python3 /path/to/og-notify/scripts/codex_notify.py \
+  '{"type":"agent-turn-complete","client":"codex-tui","input-messages":["test"],"last-assistant-message":"ok"}'
+
+# 2. --dry-run で payload を確認（Discord に送信しない）
+NOTIFY_CHANNEL=discord NOTIFY_ENV=dev \
+  scripts/notify --dry-run --kind ai_task_completed --source codex-tui "test"
+
+# 3. smoke-test channel で Discord 疎通確認（discord-test webhook を使用）
+python3 /path/to/og-notify/scripts/codex_notify.py --smoke-test
+```
+
 ### Dry-run verification
 
 Run the bridge directly before enabling real Discord delivery:
@@ -529,7 +708,7 @@ Current behavior behind that table:
 
 | gap | current state | operational impact | follow-up direction |
 |---|---|---|---|
-| Codex `task_failed` | Not operationalized in the current repo docs/tests. The documented Codex path covers `agent-turn-complete` only. | A Codex run that stops before completion can fail without an out-of-band notification, so operators still need the terminal or host session to notice it. | Add a dedicated Codex failure path only if Codex exposes a stable failure-side notify signal worth standardizing here. |
+| Codex `task_failed` | **upstream-blocked (#292)**: Codex CLI の `notify` hook は `agent-turn-complete` のみ公開しており、failure-side の signal は現時点で未確認。`scripts/codex_notify.py` への `ai_task_failed` マッピングは Codex 側が安定した failure signal を公開するまで追加しない。interim 運用: Codex が異常終了した場合はターミナルセッションで手動確認する。 | A Codex run that stops before completion can fail without an out-of-band notification, so operators still need the terminal or host session to notice it. | Revisit when Codex CLI exposes a stable failure-side notify signal. |
 | Codex or Claude `needs_input` | Unsupported. Current bridges emit only on task completion or process exit. | Approval waits, clarification requests, and other human-blocked pauses remain silent in Discord and other adapters. | Treat this as a separate contract/bridge feature once a stable upstream signal and `next_action` projection are defined. |
 | Codex or Claude `long_task_finished` | Unsupported in the AI CLI wrappers. Current flows only classify whole-task completion, not sub-jobs such as watch/build/sync loops finishing. | Operators cannot rely on the current AI CLI wrappers to distinguish “background job finished” from “requested task finished.” | Handle long-running job notifications in a separate wrapper/launcher design rather than stretching the completion path. |
 | Non-completion metadata richness | Partial. The contract defines `next_action`, `task_ref`, `run_url`, and `metadata`, but `scripts/notify` currently projects only title/source/message fields to adapters. | Even where `task_failed` exists today, adapters cannot display actionable follow-up detail without wrapper-contract work. | Keep adapters on the current minimal projection for #255 and cut any metadata expansion as a dedicated wrapper follow-up. |
