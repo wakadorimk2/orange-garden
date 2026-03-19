@@ -54,7 +54,7 @@ boundary.
 **`web/app/` は generated artifact** — 以下の制約に注意:
 
 - `pip wheel` / `python -m build` 前に必ず `pnpm build` を実行すること
-- ビルド未実施のままインストールした場合、`web/app/` はパッケージに含まれない（setuptools は存在しないパスを警告なく無視する）
+- ビルド未実施のまま `pip wheel` / `pip install` すると、packaging は `run pnpm build in frontend/ first` を含む明示的エラーで停止する
 - `make frontend-check` でビルド成果物の存在を事前確認できる
 
 Python 側で `/app/` を配信する際は `importlib.resources.files("personal_mcp").joinpath("web/app")` を起点として読む。
