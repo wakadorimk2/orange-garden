@@ -355,10 +355,14 @@ def test_http_get_dashboard_200(data_dir: Path) -> None:
 def test_http_get_dashboard_uses_issue_257_bucket_contract(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     _, _, html = _do_get_html(handler_cls, "/dashboard")
-    assert "var colors = ['#eeeeee', '#ffd9b3', '#ffaa55', '#ff7700', '#cc4400'];" in html
-    assert "cell.style.background = heatColor(item.bucket_index);" in html
-    assert "if (n < 0) return colors[0];" in html
-    assert "if (n >= colors.length) return colors[colors.length - 1];" in html
+    assert "--heatmap-bucket-0: #efefef;" in html
+    assert "--heatmap-bucket-1: #d5e8d0;" in html
+    assert "--heatmap-bucket-2: #9ec899;" in html
+    assert "--heatmap-bucket-3: #5fa058;" in html
+    assert "--heatmap-bucket-4: #3a7035;" in html
+    assert ".heatmap-cell--bucket-0 { background: var(--heatmap-bucket-0); }" in html
+    assert ".heatmap-cell--bucket-4 { background: var(--heatmap-bucket-4); }" in html
+    assert "var bucketIdx = Math.max(0, Math.min(4, item.bucket_index || 0));" in html
     assert "if (n <= 2) return '#ffd9b3';" not in html
 
 
@@ -513,8 +517,10 @@ def test_http_get_dashboard_renders_recent_6_weeks_heatmap_script(data_dir: Path
 def test_http_get_dashboard_uses_heatmap_bucket_index_for_color(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     _, _, html = _do_get_html(handler_cls, "/dashboard")
-    assert "var colors = ['#eeeeee', '#ffd9b3', '#ffaa55', '#ff7700', '#cc4400'];" in html
-    assert "cell.style.background = heatColor(item.bucket_index);" in html
+    assert "cell.className = 'heatmap-cell heatmap-cell--bucket-' + bucketIdx;" in html
+    assert "if (item.count === 0) cell.classList.add('heatmap-cell-empty');" in html
+    assert "cell.style.background = heatColor(item.bucket_index);" not in html
+    assert "function heatColor(n) {" not in html
     assert "cell.title = item.date + ': ' + item.count + '件';" in html
 
 
