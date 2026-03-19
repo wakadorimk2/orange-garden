@@ -16,7 +16,10 @@ or similar. Keep adapters thin — no business logic, only protocol translation.
 | Adapter | File | Status |
 |---------|------|--------|
 | MCP (base) | `adapters/mcp_server.py` | Placeholder |
-| HTTP (mobile log form) | `adapters/http_server.py` | MVP (Issue #145) |
+| HTTP (web UI / event ingest) | `adapters/http_server.py` | Current runtime surface for `/`, `/dashboard`, `/input`, `/api/*`, `/events`, `/events/ui` |
+
+HTTP adapter の route boundary と将来の `/app/` / auth shell の整理は
+[`docs/web-ui-boundary.md`](./web-ui-boundary.md) を参照。
 
 ## Adding a new adapter
 
