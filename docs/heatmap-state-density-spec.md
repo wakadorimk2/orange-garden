@@ -79,18 +79,18 @@ shipped_density[date] = count(events WHERE
 ```
 
 - 集計単位: ローカル日（timezone-aware）
-- 集計期間: 直近 28 日（当日含む）
+- 集計期間: 直近 42 日（当日含む）
 - データ形状: `[{date: "YYYY-MM-DD", count: N}]`（現在の `/api/heatmap` と同形）
 
 この定義が `/api/heatmap` で返すべき v1 の意味定義。
 
 **現在の実装**: `#317` 適用後の `/api/heatmap` は `shipped_density` を返している。
 
-### Current baseline vs future UI range
+### Current shipped range boundary
 
-- current baseline: `/api/heatmap` は直近 28 日の `shipped_density` を返す
-- future `/app/` shipped UI policy: primary heatmap view は recent 6 weeks を前提に構成する（#353, #357, #408）
-- したがって、28-day API baseline と 6-week UI primary view は同一の決定ではなく、後者は range aggregation / UI issue 側で扱う
+- current shipped baseline: `/api/heatmap` は直近 42 日の `shipped_density` を返す
+- current shipped consumer: maintained dashboard UI（`/` と `/dashboard`）はこの 42-day heatmap を表示する
+- #408 / #391 が扱うのは、この near range を超える history をどう集約・表示するかであり、現行 consumer route の切り替えではない
 
 ### 3.1 Population seam (Issue #332)
 

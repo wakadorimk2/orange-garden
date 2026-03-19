@@ -19,9 +19,8 @@ The output is a contract that:
 - downstream metric work can extend without reopening source-family normalization
 - temporal zoom support can be built on through an explicit future-state range contract
 
-This document defines a future-state contract.
-It does not retroactively change the current shipped `/api/heatmap` baseline, which still returns the last local 28 days, and it does not implement anything.
-The intended consumer-side primary view for that future state is the `/app/` main dashboard page tracked by #353, #406, and #357, where the near range is treated as the most recent 6 weeks.
+This document defines a future-state contract for history ranges beyond the currently shipped near view.
+It does not change the current shipped `/api/heatmap` baseline, which already returns the last local 42 days, and it does not decide which route consumes future range-aware data.
 
 ---
 
@@ -71,7 +70,7 @@ They may be adjusted by implementation without revisiting this document, as long
 
 ### 3.2 Boundary rationale
 
-The current shipped baseline remains the 28-day `/api/heatmap` contract defined in `docs/heatmap-metric-derivation-spec.md`.
+The current shipped baseline remains the 42-day `/api/heatmap` contract defined in `docs/heatmap-metric-derivation-spec.md`.
 
 Within the future-state contract defined here, the near boundary is the most recent 42 days (6 weeks) at daily resolution.
 That future-state boundary should not be changed by #408 or #391 without reopening this policy.
