@@ -30,11 +30,14 @@ personal-mcp-core
 |-------|--------|----------------|
 | Entrypoint | `server.py` | Subcommand CLI; parses args and dispatches to tools/adapters |
 | Adapter | `adapters/mcp_server.py` | Translates MCP protocol to internal calls |
-| Adapter | `adapters/http_server.py` | HTTP server for mobile log form (`web-serve`) |
+| Adapter | `adapters/http_server.py` | HTTP server: mobile log form + `/app/` static serving (`web-serve`) |
 | Tools | `tools/*.py` | Domain logic: event, daily_summary, github_*, worker, poe2 |
 | Storage | `storage/events_store.py` | Storage boundary: runtime read/write against `events.db`, plus explicit recovery rebuild commands for `events.jsonl` |
 | Core | `core/guide.py` | Loads and caches the AI guide text |
 | Data | `AI_GUIDE.md` | The guide content itself |
+
+ルート別の責務分離と将来の public/auth shell 境界については
+[`docs/web-ui-boundary.md`](./web-ui-boundary.md) を参照。
 
 Runtime module の import / layering / dependency 制約は
 [`docs/import-layering-dependency-constraints.md`](./import-layering-dependency-constraints.md)
