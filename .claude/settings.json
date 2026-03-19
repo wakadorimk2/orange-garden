@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown); wt=$(basename \"$(git rev-parse --show-toplevel 2>/dev/null)\" 2>/dev/null || echo unknown); NOTIFY_CHANNEL=discord /home/wakadori/projects/og-notify/scripts/notify --kind ai_task_completed --source claude_code \"Claude turn completed [$wt/$branch]\"'"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown); wt=$(basename \"$(git rev-parse --show-toplevel 2>/dev/null)\" 2>/dev/null || echo unknown); NOTIFY_CHANNEL=discord /home/wakadori/projects/og-notify/scripts/notify --event needs_input --source claude_code --title \"Claude Code\" \"Claude needs your attention [$wt/$branch]\"'"
+          }
+        ]
+      }
+    ]
+  }
+}
