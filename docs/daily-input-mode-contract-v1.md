@@ -66,7 +66,7 @@
 
 推奨（任意）:
 
-- `candidate_source`（`recent` / `today_frequent` / `7d_frequent` / `fixed` / `free_text`）
+- `candidate_source`（canonical source 値や required / optional の shape は code / type / schema 側を正本とし、この文書では比較用メタデータとしてのみ扱う。テキスト入力由来の場合は `free_text` を追加する）
 
 補足:
 

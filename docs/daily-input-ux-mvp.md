@@ -129,26 +129,17 @@ recent > today_frequent > 7d_frequent > fixed
 
 #### 5.1.1 候補生成 API の最小 contract
 
-MVP の候補生成 API contract はこの文書に吸収して管理する。
-
+- この文書は候補生成の意図・責務・制約・不変条件を扱う。field-level の response shape、required / optional、nullable / omitted、canonical enum は code / type / schema 側を正本とする。
 - Endpoint: `GET /api/candidates`
-- Response: `200` で候補配列を返す。最大 8 件
-- Field:
-  - `text`: UI に表示する候補テキスト
-  - `source`: 候補ソース（`recent` / `today_frequent` / `7d_frequent` / `fixed`）
-- cold start 判定は API 側で実施する
-  - 対象イベント件数 `< 7`: `fixed` のみ返す
-  - 対象イベント件数 `>= 7`: 4 ソースを有効化する
-- マージ優先順: `recent > today_frequent > 7d_frequent > fixed`
-- 正規化後テキスト重複は 1 件に統合し、より高優先度ソースを採用する
-  - 正規化は `strip + lower`（前後空白除去 + 小文字化）
-- 各 `data.text` からは 1 文あたり最大 2 候補まで返す
+- Response: `200` で候補配列を返す
+- 各候補は UI に表示するテキストと、その由来を表す source を持つ
 - 候補対象は `domain != summary` かつ `kind != interaction` のイベントに限定する
+- 上限件数・優先順・正規化・cold start ルールは Section 3–4 を参照
 
 ```json
 [
-  { "text": "休憩", "source": "recent" },
-  { "text": "作業開始", "source": "fixed" }
+  { "text": "休憩", "source": "..." },
+  { "text": "作業開始", "source": "..." }
 ]
 ```
 
