@@ -50,8 +50,9 @@ Default mapping:
 
 ## Global notification toggle (NOTIFY_ENABLED)
 
-`NOTIFY_ENABLED=0` を設定すると、`scripts/notify` はメッセージを出力せずに即座に `exit 0` する。
-アダプターは呼ばれない。デフォルト値は `1`(通知有効)。
+`NOTIFY_ENABLED=0` を設定すると、`scripts/notify` は通常の通知送信を行わず `exit 0` する。
+アダプターは呼ばれない。デフォルト値は `1`(通知有効)。ただし `--dry-run` は例外で、
+通知無効環境でも payload 確認のために実行できる。
 
 ```bash
 # 通知を一時的に無効化する
@@ -74,7 +75,7 @@ export NOTIFY_ENABLED=0  # 開発マシンでは無効
 ## Dry-run mode
 
 `--dry-run` を渡すと、Discord などのアダプターを呼ばずに payload を stdout へ出力して終了する。
-`NOTIFY_ENABLED=0` と異なり、メッセージ解決・ルーティング・prefix 付与はすべて実行される。
+`NOTIFY_ENABLED=0` と併用しても、メッセージ解決・ルーティング・prefix 付与はそのまま実行される。
 
 ```bash
 # Discord を呼ばずに payload を確認

@@ -18,10 +18,6 @@ ADAPTER_CHANNEL=""
 DISCORD_WEBHOOK_ENV_NAME=""
 DISCORD_WEBHOOK_SECRET_FILE=""
 
-if [[ "${NOTIFY_ENABLED:-1}" == "0" ]]; then
-  exit 0
-fi
-
 notification_kind_event() {
   case "$1" in
     ai_task_completed)
@@ -285,6 +281,10 @@ fi
 if [[ -z "$MESSAGE" ]]; then
   echo "notify: empty message is not allowed" >&2
   exit 2
+fi
+
+if [[ "${NOTIFY_ENABLED:-1}" == "0" && "$DRY_RUN" != "1" ]]; then
+  exit 0
 fi
 
 resolve_notification_route "$CHANNEL"
