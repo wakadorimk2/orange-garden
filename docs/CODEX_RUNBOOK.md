@@ -64,6 +64,48 @@ preflight 完了後に Codex が実施する実行フローである。両者を
 | 自動修正ループ | 禁止 | 最大 2 サイクル、3 回収束しなければ停止 |
 | 出力形式 | `Summary / Preflight Checks / Failures / Next Step` | Draft PR 本文（PR Body Template） |
 
+## Frontend Dev / Build / Run 補足
+
+通常運用は Python-first を前提とする。React UI を触るときだけ、以下の追加手順を使う。
+
+**Dev (HMR):**
+
+```bash
+pnpm --dir frontend install
+pnpm --dir frontend dev
+```
+
+- Vite dev server に直接アクセスして確認する
+
+**Build and serve via Python:**
+
+```bash
+pnpm --dir frontend install
+pnpm --dir frontend build
+make run
+```
+
+- build artifact は `src/personal_mcp/web/app/` に出力される
+- Python server の `/app/` は build 済み artifact を配信する
+- handoff contract の正本は [`docs/adapters.md`](./adapters.md)
+
+**Missing-build behavior:**
+
+- `/app/` へアクセスしたとき `index.html` が無ければ 503 と `run pnpm build in frontend/ first` ヒントを返す
+- `pip wheel` / `python -m build` / non-editable な `pip install .` は build artifact 不足時に明示エラーで停止する
+- `make frontend-check` は `src/personal_mcp/web/app/index.html` 不在時に non-zero で失敗する
+
+復旧手順:
+
+```bash
+pnpm --dir frontend build
+```
+
+CI 補足:
+
+- `.github/workflows/ci.yml` の `frontend-build` job は push / pull request ごとに `pnpm install --frozen-lockfile` と `pnpm build` を実行する
+- この job は frontend build 成功確認のみを担い、artifact の packaging / deploy は行わない
+
 ## Standard Flow
 
 ### 1. Safety Check
