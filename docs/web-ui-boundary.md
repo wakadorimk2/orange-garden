@@ -9,7 +9,6 @@
 |---|---|---|---|
 | `/` | Python (inline HTML) | stdlib HTTP + vanilla JS | 現行・維持 |
 | `/dashboard` | 同上 | 同上 | 現行・維持 |
-| `/input` | 同上 | 同上 | 現行・維持 |
 | `/api/*` | Python (JSON) | stdlib HTTP | 現行・維持 |
 | `/app/*` | Python (static serve) | Vite + React build 成果物 | #442 で導入 |
 | `/app/` (未 build) | Python | 503 + hint レスポンス | #442 で導入 |
@@ -20,8 +19,8 @@ read route とは別に、既存 UI は以下の write endpoint を使う。
 
 | エンドポイント | 主な利用元 | 役割 | 状態 |
 |---|---|---|---|
-| `/events` | `/input`, `/dashboard` | イベント記録の標準 POST 面 | 現行・維持 |
-| `/events/ui` | `/dashboard` | UI 操作ログと入力フロー記録 | 現行・維持 |
+| `/events` | `/dashboard`, `/app/` | イベント記録の標準 POST 面 | 現行・維持 |
+| `/events/ui` | `/dashboard`, `/app/` | UI 操作ログと入力フロー記録 | 現行・維持 |
 
 ## 今回の実装範囲（Epic #442）
 
@@ -36,7 +35,7 @@ read route とは別に、既存 UI は以下の write endpoint を使う。
 
 以下は #442 のスコープ外であり、別 issue で判断する。
 
-- 既存 `/` `/input` `/api/*` の React 化・移行
+- 既存 `/` `/api/*` の React 化・移行
 - 認証実装
 - public hosting 構成
 - multi-user / tenancy 対応
@@ -46,7 +45,7 @@ read route とは別に、既存 UI は以下の write endpoint を使う。
 
 ## 既存 UI の扱い
 
-`/` `/input` `/api/*` と `/events*` は **現行・安定** として維持する。
+`/` `/api/*` と `/events*` は **現行・安定** として維持する。
 即時移行は要求しない。React 化の時期・方式は別 issue で判断する。
 
 ## 将来の public/auth shell について
@@ -63,7 +62,7 @@ read route とは別に、既存 UI は以下の write endpoint を使う。
 | 混同されやすい組み合わせ | 正しい理解 |
 |---|---|
 | 「`/app/` 導入 = auth 実装済み」 | `/app/` は local-first な開発面の導入のみ。auth は未実装 |
-| 「既存 UI は近々廃止される」 | 廃止計画なし。`/` `/input` は現行維持 |
+| 「既存 UI は近々廃止される」 | `/input` は #464 で削除済み。`/` は現行維持 |
 | 「public 配信ができるようになった」 | local-first の運用は変わらない。public shell は将来の別実装 |
 | 「`/app/` に認証をかける必要がある」 | local-first 利用では不要。将来の shell 側で差し込む設計 |
 | 「`/events*` は `/app/` 導入後に自動で置き換わる」 | 置換計画は未定。既存 UI の write 面として維持中 |

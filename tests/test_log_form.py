@@ -513,18 +513,6 @@ def test_http_post_ui_events_dashboard_accepts_free_text_candidate_source(data_d
     assert body["data"]["edited_before_submit"] is False
 
 
-def test_make_html_shows_optional_labels_and_suggestion() -> None:
-    from personal_mcp.adapters.http_server import _make_html
-
-    html = _make_html()
-    assert 'id="domain" required' not in html
-    assert 'id="kind" required' not in html
-    assert 'id="suggestion"' in html
-    assert 'data-mode="quick"' in html
-    assert 'data-mode="tag"' in html
-    assert 'data-mode="text"' in html
-
-
 # ---------------------------------------------------------------------------
 # CLI: web-serve subcommand wiring
 # ---------------------------------------------------------------------------

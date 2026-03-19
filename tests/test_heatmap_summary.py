@@ -382,16 +382,6 @@ def test_http_get_index_html_returns_dashboard_html(data_dir: Path) -> None:
     assert 'id="heatmap"' in index_html
 
 
-def test_http_get_input_returns_legacy_log_form_html(data_dir: Path) -> None:
-    handler_cls = _make_handler_for_test(str(data_dir))
-    statuses, headers, html = _do_get_html(handler_cls, "/input")
-    assert statuses == [200]
-    assert headers["Content-Type"] == "text/html; charset=utf-8"
-    assert 'data-mode="quick"' in html
-    assert 'id="suggestion"' in html
-    assert 'id="heatmap"' not in html
-
-
 def test_http_get_heatmap_200(data_dir: Path) -> None:
     handler_cls = _make_handler_for_test(str(data_dir))
     resp = _do_get_json(handler_cls, "/api/heatmap")
