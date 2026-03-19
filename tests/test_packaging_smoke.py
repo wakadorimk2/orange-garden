@@ -24,6 +24,10 @@ def _write_frontend_index(
     app_dir = repo_root / "src" / "personal_mcp" / "web" / "app"
     app_dir.mkdir(parents=True, exist_ok=True)
     (app_dir / "index.html").write_text(html, encoding="utf-8")
+    assets_dir = app_dir / "assets"
+    assets_dir.mkdir(exist_ok=True)
+    (assets_dir / "main.js").write_text("console.log('main')", encoding="utf-8")
+    (assets_dir / "style.css").write_text("body { margin: 0; }", encoding="utf-8")
 
 
 def _build_wheel(
@@ -157,6 +161,20 @@ def test_build_fails_with_hint_when_frontend_artifact_is_missing(tmp_path: Path)
     dist_dir = tmp_path / "dist"
 
     shutil.rmtree(repo_copy / "src" / "personal_mcp" / "web" / "app", ignore_errors=True)
+    shutil.rmtree(repo_copy / "build", ignore_errors=True)
+
+    result = _build_wheel(repo_copy, dist_dir, check=False)
+
+    assert result.returncode != 0
+    assert "run pnpm build in frontend/ first" in (result.stderr + result.stdout)
+
+
+def test_build_fails_with_hint_when_frontend_assets_are_missing(tmp_path: Path) -> None:
+    repo_copy = _copy_repo(tmp_path)
+    dist_dir = tmp_path / "dist"
+
+    _write_frontend_index(repo_copy)
+    shutil.rmtree(repo_copy / "src" / "personal_mcp" / "web" / "app" / "assets")
     shutil.rmtree(repo_copy / "build", ignore_errors=True)
 
     result = _build_wheel(repo_copy, dist_dir, check=False)
