@@ -93,8 +93,7 @@ def build_worker_claim_event(
         event["target_worker_id"] = normalized_target_worker_id
     elif normalized_target_worker_id is not None:
         raise ValueError(
-            "target_worker_id is only allowed for "
-            f"handoff_offer, got {normalized_event_type}"
+            f"target_worker_id is only allowed for handoff_offer, got {normalized_event_type}"
         )
 
     if normalized_event_type == "claim":
@@ -244,8 +243,7 @@ def derive_worker_claim_state(
         else:
             if parsed_event["issue_number"] != normalized_issue_number:
                 invalid_reason = (
-                    "issue_number does not match requested issue "
-                    f"{normalized_issue_number}"
+                    f"issue_number does not match requested issue {normalized_issue_number}"
                 )
             else:
                 event_type = parsed_event["event_type"]
@@ -356,8 +354,8 @@ def derive_worker_claim_state(
 
 
 def _resolve_github_token(token: Optional[str]) -> str:
-    resolved = _normalize_optional(token) or os.environ.get("GH_TOKEN") or os.environ.get(
-        "GITHUB_TOKEN"
+    resolved = (
+        _normalize_optional(token) or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     )
     if not isinstance(resolved, str) or not resolved.strip():
         raise ValueError("GitHub token is required; set --token, GH_TOKEN, or GITHUB_TOKEN")
