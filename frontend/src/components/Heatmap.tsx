@@ -6,6 +6,10 @@ interface HeatmapEntry {
   bucket_index: number;
 }
 
+interface HeatmapProps {
+  refreshKey: number;
+}
+
 function monthDay(iso: string): string {
   const parts = iso.split("-");
   if (parts.length !== 3) return iso;
@@ -25,7 +29,7 @@ function splitIntoWeeks(entries: HeatmapEntry[]): HeatmapEntry[][] {
   return weeks;
 }
 
-export default function Heatmap() {
+export default function Heatmap({ refreshKey }: HeatmapProps) {
   const [entries, setEntries] = useState<HeatmapEntry[]>([]);
 
   useEffect(() => {
@@ -35,7 +39,7 @@ export default function Heatmap() {
         setEntries(Array.isArray(data) ? (data as HeatmapEntry[]) : []);
       })
       .catch(() => setEntries([]));
-  }, []);
+  }, [refreshKey]);
 
   const weeks = splitIntoWeeks(entries);
   const startDate = entries[0]?.date ?? "";
@@ -46,7 +50,9 @@ export default function Heatmap() {
     <section className="heatmap-shell" aria-labelledby="heatmap-title">
       <div className="heatmap-header">
         <h2 id="heatmap-title">直近6週間</h2>
-        <span className="heatmap-range-label">{rangeLabel}</span>
+        <span className="heatmap-range-label" aria-live="polite">
+          {rangeLabel}
+        </span>
       </div>
       <div className="heatmap-grid" aria-label="直近6週間のヒートマップ">
         {weeks.map((week) => (

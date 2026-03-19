@@ -29,6 +29,10 @@ interface UiEventExtraData {
   reason?: string;
 }
 
+interface QuickLogProps {
+  onSaveSuccess: () => void;
+}
+
 function newDashboardFlowId() {
   return `dashboard-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -41,7 +45,7 @@ function savedCandidateKey(candidate: Candidate) {
   return candidate.text.trim();
 }
 
-export default function QuickLog() {
+export default function QuickLog({ onSaveSuccess }: QuickLogProps) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -236,6 +240,7 @@ export default function QuickLog() {
         void postUiEvent("input_submitted", telemetryData);
         void postUiEvent("save_success", telemetryData);
         await loadCandidates();
+        onSaveSuccess();
         scheduleMessageClear();
         return true;
       }
