@@ -21,6 +21,7 @@ The output is a contract that:
 
 This document defines a future-state contract.
 It does not retroactively change the current shipped `/api/heatmap` baseline, which still returns the last local 28 days, and it does not implement anything.
+The intended consumer-side primary view for that future state is the `/app/` main dashboard page tracked by #353, #406, and #357, where the near range is treated as the most recent 6 weeks.
 
 ---
 
@@ -289,6 +290,6 @@ The following are explicitly deferred to other issues:
 - Issue #408 — scope and acceptance criteria for this document
 - Issue #407 — daily metric derivation seam (upstream)
 - Issue #391 — history navigation UI (downstream consumer)
-- Issue #353 — top-level heatmap epic; recent-6-week primary view policy
+- Issue #353 — top-level heatmap epic; recent-6-weeks primary view policy
 - Issue #355 — shared bucket mapping contract (downstream)
-- Issue #357 — recent-6-week primary view implementation (CLOSED)
+- Issue #357 — recent-6-weeks primary view implementation

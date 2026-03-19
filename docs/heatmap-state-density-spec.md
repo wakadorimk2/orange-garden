@@ -86,6 +86,12 @@ shipped_density[date] = count(events WHERE
 
 **現在の実装**: `#317` 適用後の `/api/heatmap` は `shipped_density` を返している。
 
+### Current baseline vs future UI range
+
+- current baseline: `/api/heatmap` は直近 28 日の `shipped_density` を返す
+- future `/app/` shipped UI policy: primary heatmap view は recent 6 weeks を前提に構成する（#353, #357, #408）
+- したがって、28-day API baseline と 6-week UI primary view は同一の決定ではなく、後者は range aggregation / UI issue 側で扱う
+
 ### 3.1 Population seam (Issue #332)
 
 Issue #332 は heatmap semantics の再定義ではなく、legacy telemetry を scale 母集団から分離するための
