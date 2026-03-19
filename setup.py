@@ -1,44 +1,36 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
+
 from setuptools import setup
 from setuptools.command.build_py import build_py
-from setuptools.command.egg_info import egg_info
+from setuptools.command.sdist import sdist
+
+FRONTEND_INDEX = (
+    Path(__file__).resolve().parent / "src" / "personal_mcp" / "web" / "app" / "index.html"
+)
+
+
+def ensure_frontend_artifact() -> None:
+    if not FRONTEND_INDEX.is_file():
+        raise RuntimeError("frontend build missing: run pnpm build in frontend/ first")
 
 
 class BuildPyWithFrontendCheck(build_py):
     def run(self) -> None:
-        sentinel = os.path.join(
-            os.path.dirname(__file__),
-            "src",
-            "personal_mcp",
-            "web",
-            "app",
-            "index.html",
-        )
-        if not os.path.isfile(sentinel):
-            raise RuntimeError("frontend build missing: run pnpm build in frontend/ first")
+        ensure_frontend_artifact()
         super().run()
 
 
-class EggInfoWithFrontendCheck(egg_info):
+class SdistWithFrontendCheck(sdist):
     def run(self) -> None:
-        sentinel = os.path.join(
-            os.path.dirname(__file__),
-            "src",
-            "personal_mcp",
-            "web",
-            "app",
-            "index.html",
-        )
-        if not os.path.isfile(sentinel):
-            raise RuntimeError("frontend build missing: run pnpm build in frontend/ first")
+        ensure_frontend_artifact()
         super().run()
 
 
 setup(
     cmdclass={
         "build_py": BuildPyWithFrontendCheck,
-        "egg_info": EggInfoWithFrontendCheck,
+        "sdist": SdistWithFrontendCheck,
     }
 )

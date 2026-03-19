@@ -45,6 +45,16 @@ def _build_wheel(
     )
 
 
+def _run_egg_info(repo_root: Path, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "setup.py", "egg_info"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=check,
+    )
+
+
 def test_wheel_contains_dashboard_template_and_can_load_it(tmp_path: Path) -> None:
     repo_root = _copy_repo(tmp_path)
     dist_dir = tmp_path / "dist"
@@ -131,3 +141,14 @@ def test_build_fails_with_hint_when_frontend_artifact_is_missing(tmp_path: Path)
 
     assert result.returncode != 0
     assert "run pnpm build in frontend/ first" in (result.stderr + result.stdout)
+
+
+def test_egg_info_allows_metadata_generation_without_frontend_artifact(tmp_path: Path) -> None:
+    repo_copy = _copy_repo(tmp_path)
+
+    shutil.rmtree(repo_copy / "src" / "personal_mcp" / "web" / "app", ignore_errors=True)
+    shutil.rmtree(repo_copy / "build", ignore_errors=True)
+
+    result = _run_egg_info(repo_copy)
+
+    assert result.returncode == 0
