@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import mimetypes
+import os.path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -362,6 +364,23 @@ _DASHBOARD_HTML = load_dashboard_html().replace(
 )
 
 
+_APP_ROOT = files("personal_mcp.web").joinpath("app")
+
+
+def _sanitize_subpath(raw: str) -> str:
+    """Return a safe relative path within app root, stripping traversal attempts."""
+    parts: list[str] = []
+    for part in raw.lstrip("/").split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if parts:
+                parts.pop()
+        else:
+            parts.append(part)
+    return "/".join(parts)
+
+
 def _make_html() -> str:
     domain_opts = "\n      ".join(
         f'<option value="{d}">{d}</option>' for d in sorted(ALLOWED_DOMAINS)
@@ -389,6 +408,36 @@ def _make_handler(data_dir: str):
                 self.wfile.write(payload)
             except (BrokenPipeError, ConnectionResetError):
                 return
+
+        def _serve_app(self, subpath: str) -> None:
+            index = _APP_ROOT.joinpath("index.html")
+            if not index.is_file():
+                self._json(
+                    503,
+                    {"error": "frontend not built", "hint": "run pnpm build in frontend/ first"},
+                )
+                return
+            target = _APP_ROOT
+            for part in subpath.split("/"):
+                if part:
+                    target = target.joinpath(part)
+            if target.is_file():
+                fname = subpath.split("/")[-1] if subpath else "index.html"
+            else:
+                # Distinguish SPA routes (no ext / .html) from missing assets
+                leaf = subpath.split("/")[-1] if subpath else ""
+                _, ext = os.path.splitext(leaf)
+                if ext and ext.lower() not in (".html", ".htm"):
+                    # e.g. /app/assets/missing.js → 404, not SPA fallback
+                    self._json(404, {"error": "not found"})
+                    return
+                # SPA fallback: extension-less or .html path → serve index.html
+                target = index
+                fname = "index.html"
+            data = target.read_bytes()
+            ct, _ = mimetypes.guess_type(fname)
+            charset = "utf-8" if ct == "text/html" else None
+            self._write_response(200, ct or "application/octet-stream", data, charset=charset)
 
         def _json(self, status: int, body: Any) -> None:
             payload = json.dumps(body, ensure_ascii=False).encode()
@@ -433,6 +482,9 @@ def _make_handler(data_dir: str):
                 self._json(200, list_candidates(data_dir or None))
             elif parsed.path == "/api/summaries/list":
                 self._json(200, list_summaries(28, data_dir or None))
+            elif parsed.path == "/app" or parsed.path.startswith("/app/"):
+                subpath = _sanitize_subpath(parsed.path[len("/app") :])
+                self._serve_app(subpath)
             else:
                 self._json(404, {"error": "not found"})
 
