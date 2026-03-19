@@ -1,7 +1,10 @@
+import "./index.css";
+import QuickLog from "./components/QuickLog";
+
 export default function App() {
   return (
-    <div>
-      <p>orange-garden /app/ — UI 開発面</p>
+    <div className="app-shell">
+      <QuickLog />
     </div>
   );
 }

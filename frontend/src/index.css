@@ -1,0 +1,119 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.quicklog-intro {
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+/* candidate tags */
+.candidates {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.candidate-tag {
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #e0a244;
+  background: #fff7e8;
+  color: #7c3f00;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.candidate-tag:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* sticky composer */
+.log-form {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -1rem 1.5rem;
+  padding: 0.75rem 1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), #ffffff 28%);
+  border-top: 1px solid #eee;
+  box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.log-text {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  height: 4rem;
+  resize: vertical;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.composer-meta {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.draft-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-submit {
+  padding: 0.75rem;
+  font-size: 1rem;
+  cursor: pointer;
+  min-height: 2.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f8f8f8;
+  white-space: nowrap;
+}
+
+.log-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.log-msg {
+  margin-top: 0.5rem;
+  min-height: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.msg-ok {
+  color: #2a7a2a;
+}
+
+.msg-err {
+  color: #c0392b;
+}
