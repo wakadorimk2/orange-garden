@@ -157,24 +157,25 @@ side-effect 担当 runtime が実行してよい GitHub 操作は以下に限定
 - PR 作成
 - PR 本文の更新
 - PR コメント
-- PR へのラベル付与
-- PR への assignee 設定
+- PR / Issue へのラベル付与
+- PR / Issue への assignee 設定
 
-条件付き許可:
-
-- Project 追加や更新は、当該 Issue または Maintainer 指示で必要性が明示されている場合のみ
-
-禁止:
-
-- Issue 本文の編集を原則禁止とする
-- Issue の新規作成
-- マイルストーンや Project の大規模編集
-
-Issue 本文編集の最終ポリシー:
+Issue content edit（title / body / checklist / dependency / acceptance criteria の変更）:
 
 - 原則禁止
 - 例外は、Maintainer が明示的に依頼した「誤字修正」「リンク修正」「Markdown 整形」に限る
 - 例外時も、Issue のスコープ、受け入れ条件、チェックリスト、責務分担を変えてはならない
+- 本文変更が必要な場合は、本文を直接更新せず PR / Issue コメントで修正案を提案する
+
+条件付き許可:
+
+- Issue の新規作成は、Maintainer 指示または当該 Issue / task で必要性が明示され、テンプレ準拠かつスコープ変更を伴わない場合に限る
+- Project 追加や更新は、当該 Issue または Maintainer 指示で必要性が明示されている場合のみ
+
+禁止:
+
+- Issue content edit の無断実施
+- マイルストーンや Project の大規模編集
 
 ---
 

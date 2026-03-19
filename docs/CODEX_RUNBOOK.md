@@ -406,8 +406,8 @@ EOF
 
 ## Skill-backed appendices
 
-この runbook は、日常運用で高頻度に参照される skill spec を吸収している。
-以下は独立 docs ではなく、本書を canonical source とする。
+この runbook は、日常運用で高頻度に参照される skill の runtime-specific execution detail を付録として保持する。
+canonical source は各 skill doc を優先し、本書は Codex 向け実行詳細のみを補足する。
 
 - `review-diff`
 - `review-preflight`
@@ -416,6 +416,8 @@ EOF
 - `issue-project-meta`
 
 ### Appendix A. review-diff
+
+Canonical source: [`docs/skills/review-diff.md`](./skills/review-diff.md)
 
 目的:
 
@@ -445,6 +447,8 @@ Constraints:
 - `ruff` / `pytest` 失敗が見えても、自動修正には進まない
 
 ### Appendix B. review-preflight
+
+Canonical source: [`docs/skills/review-preflight.md`](./skills/review-preflight.md)
 
 目的:
 
