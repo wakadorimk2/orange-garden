@@ -33,8 +33,12 @@ function newDashboardFlowId() {
   return `dashboard-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function candidateKey(candidate: Candidate) {
+function candidateRenderKey(candidate: Candidate) {
   return `${candidate.source ?? ""}\u0000${candidate.text}`;
+}
+
+function savedCandidateKey(candidate: Candidate) {
+  return candidate.text.trim();
 }
 
 export default function QuickLog() {
@@ -48,6 +52,7 @@ export default function QuickLog() {
   const textFlowRef = useRef<DashboardFlow | null>(null);
   const clearMsgTimeoutRef = useRef<number | null>(null);
   const savedTagTimeoutRef = useRef<number | null>(null); // #427
+  const savedTagFrameRef = useRef<number | null>(null); // #427
   const savingRef = useRef(false);
 
   useEffect(() => {
@@ -59,6 +64,9 @@ export default function QuickLog() {
       }
       if (savedTagTimeoutRef.current !== null) {
         window.clearTimeout(savedTagTimeoutRef.current);
+      }
+      if (savedTagFrameRef.current !== null) {
+        window.cancelAnimationFrame(savedTagFrameRef.current);
       }
     };
   }, []);
@@ -158,6 +166,36 @@ export default function QuickLog() {
     }, 3000);
   }
 
+  function scheduleSavedTagClear() {
+    if (savedTagTimeoutRef.current !== null) {
+      window.clearTimeout(savedTagTimeoutRef.current);
+    }
+    savedTagTimeoutRef.current = window.setTimeout(() => {
+      setSavedTagKey(null);
+      savedTagTimeoutRef.current = null;
+    }, 600);
+  }
+
+  function triggerSavedTagFeedback(nextSavedTagKey: string) {
+    if (savedTagFrameRef.current !== null) {
+      window.cancelAnimationFrame(savedTagFrameRef.current);
+      savedTagFrameRef.current = null;
+    }
+
+    if (savedTagKey === nextSavedTagKey) {
+      setSavedTagKey(null);
+      savedTagFrameRef.current = window.requestAnimationFrame(() => {
+        setSavedTagKey(nextSavedTagKey);
+        savedTagFrameRef.current = null;
+        scheduleSavedTagClear();
+      });
+      return;
+    }
+
+    setSavedTagKey(nextSavedTagKey);
+    scheduleSavedTagClear();
+  }
+
   async function saveLogText(
     text: string,
     flow: DashboardFlow,
@@ -192,14 +230,7 @@ export default function QuickLog() {
 
         // #427: saved tag visual feedback
         if (options?.savedCandidateKey) {
-          setSavedTagKey(options.savedCandidateKey);
-          if (savedTagTimeoutRef.current !== null) {
-            window.clearTimeout(savedTagTimeoutRef.current);
-          }
-          savedTagTimeoutRef.current = window.setTimeout(() => {
-            setSavedTagKey(null);
-            savedTagTimeoutRef.current = null;
-          }, 600);
+          triggerSavedTagFeedback(options.savedCandidateKey);
         }
 
         void postUiEvent("input_submitted", telemetryData);
@@ -261,7 +292,7 @@ export default function QuickLog() {
     });
     await saveLogText(candidate.text, flow, {
       clearDraftOnSuccess: false,
-      savedCandidateKey: candidateKey(candidate),
+      savedCandidateKey: savedCandidateKey(candidate),
     });
   }
 
@@ -305,9 +336,9 @@ export default function QuickLog() {
           <div className="candidates">
             {candidates.map((c) => (
               <button
-                key={candidateKey(c)}
+                key={candidateRenderKey(c)}
                 type="button"
-                className={`candidate-tag${savedTagKey === candidateKey(c) ? " saved" : ""}`}
+                className={`candidate-tag${savedTagKey === savedCandidateKey(c) ? " saved" : ""}`}
                 disabled={busy}
                 onClick={() => void handleCandidateTap(c)}
               >
