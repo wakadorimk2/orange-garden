@@ -1,3 +1,9 @@
+> [!NOTE]
+> **開発・保守は終了しました。** `orange-garden` はpersonal observabilityの設計と
+> 実装過程を保存するread-onlyの履歴資料です。後継は
+> [`self-observatory`](https://github.com/wakadorimk2/self-observatory)へ移行しました。
+> 新規Issue対応、PR取り込み、Releaseは予定していません。
+
 # orange-garden
 
 *A personal observability garden for events, annotations, and AI interpretation.*
